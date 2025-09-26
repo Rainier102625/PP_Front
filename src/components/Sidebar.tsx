@@ -143,7 +143,7 @@ export function Sidebar({
     };
 
     return (
-        <aside className="w-[380px] h-full bg-white border-r p-4 space-y-4 flex flex-col z-20 shadow-lg">
+        <aside className="h-full bg-white border-r p-4 space-y-4 flex flex-col z-20 shadow-lg">
             <h1 className="text-2xl font-bold">여행지 추천 검색</h1>
 
             <div className="flex items-center gap-2">

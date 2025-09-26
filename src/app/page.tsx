@@ -4,17 +4,17 @@ import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { MapContainer } from "@/components/MapContainer";
 import { RightSidebar } from "@/components/RightSidebar";
+import { RecommendationPanel } from "@/components/RecommendationPanel";
 import { OdsayRoute } from "@/types/odsay";
 import { Spot } from "@/types/spot";
 import { format } from "date-fns";
-
 import { getDistance } from "@/lib/distance";
 
 export default function Home() {
     // 애플리케이션의 핵심 상태들을 관리합니다.
     const [query, setQuery] = useState("서울역");
     const [searchedLocation, setSearchedLocation] = useState<naver.maps.LatLng | null>(null);
-    const [selectedCategory, setSelectedCategory] = useState<string | null>(null); // 카테고리 기본 선택 없음
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [selectedTime, setSelectedTime] = useState<string>("13:30");
 
     const [recommendedSpots, setRecommendedSpots] = useState<Spot[]>([]);
@@ -67,11 +67,9 @@ export default function Home() {
         setSelectedRouteIndex(0);
 
         try {
-            // 1. 현재 텍스트 쿼리로 좌표를 먼저 가져옵니다.
             const location = await geocodeQuery(query);
-            setSearchedLocation(location); // 지도 좌표 상태 업데이트
+            setSearchedLocation(location);
 
-            // 2. 가져온 좌표와 설정된 시간으로 추천 API를 호출합니다.
             const finalDateTime = new Date();
             if (selectedTime) {
                 const [hours, minutes] = selectedTime.split(':');
@@ -85,20 +83,12 @@ export default function Home() {
 
             const apiUrl = `https://pp-production-d014.up.railway.app/api/recommend/?lat=${lat}&lon=${lon}&time=${time}&type=${categoryQuery}&radius=8000`;
 
-            console.log("Requesting API URL:", apiUrl);
-
             const response = await fetch(apiUrl);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const data: Spot[] = await response.json();
-            console.log("서버로부터 받은 실제 데이터:", data);
 
-            if (data.length === 0) {
-                alert("해당 조건에 맞는 추천 장소가 없습니다.");
-            }
-
-            // 3. 프론트에서 거리 재계산 및 정렬
             const spotsWithRecalculatedDistance = data.map(spot => ({
                 ...spot,
                 distanceMeters: getDistance(lat, lon, spot.mapY, spot.mapX)
@@ -134,9 +124,8 @@ export default function Home() {
             spot.mapX
         );
 
-        // 700m 이내인 경우, 프론트에서 직접 도보 경로 생성
         if (distance < 700) {
-            const walkingTime = Math.round(distance / 80); // 분당 80m 기준
+            const walkingTime = Math.round(distance / 80);
 
             const walkingRoute: OdsayRoute = {
                 pathInfo: {
@@ -149,7 +138,7 @@ export default function Home() {
                     },
                     subPath: [
                         {
-                            trafficType: 3, // 도보
+                            trafficType: 3,
                             distance: distance,
                             sectionTime: walkingTime,
                             startX: searchedLocation.lng(),
@@ -164,10 +153,9 @@ export default function Home() {
 
             setDirectionsResult([walkingRoute]);
             setIsDirectionsLoading(false);
-            return; // API 호출 없이 종료
+            return;
         }
 
-        // 700m 이상인 경우, 기존 API 호출 로직 실행
         try {
             const url = `/api/odsay-directions?sx=${searchedLocation.lng().toFixed(6)}&sy=${searchedLocation.lat().toFixed(6)}&ex=${spot.mapX.toFixed(6)}&ey=${spot.mapY.toFixed(6)}`;
             const response = await fetch(url);
@@ -195,16 +183,36 @@ export default function Home() {
     };
 
     return (
-        <main className="relative flex h-screen w-screen">
-            <Sidebar
-                query={query}
-                onQueryChange={setQuery}
-                setSearchedLocation={setSearchedLocation}
-                onSearch={handleSearch}
-                selectedCategory={selectedCategory}
-                onCategoryChange={setSelectedCategory}
-                time={selectedTime}
-                onTimeChange={setSelectedTime}
+        <main className="flex h-screen w-screen">
+            <div className="w-[380px] flex flex-col h-full shadow-lg z-20 bg-white">
+                <Sidebar
+                    query={query}
+                    onQueryChange={setQuery}
+                    setSearchedLocation={setSearchedLocation}
+                    onSearch={handleSearch}
+                    selectedCategory={selectedCategory}
+                    onCategoryChange={setSelectedCategory}
+                    time={selectedTime}
+                    onTimeChange={setSelectedTime}
+                />
+                {isRecsPanelOpen && (
+                    <RecommendationPanel
+                        isLoading={isLoading}
+                        spots={recommendedSpots}
+                        onGetDirections={handleGetDirections}
+                    />
+                )}
+            </div>
+
+            <RightSidebar
+                isOpen={!!directionsDestination}
+                onClose={() => setDirectionsDestination(null)}
+                directionsResult={directionsResult}
+                isDirectionsLoading={isDirectionsLoading}
+                originName={query}
+                directionsDestination={directionsDestination}
+                onSelectRoute={handleSelectRoute}
+                selectedRouteIndex={selectedRouteIndex}
             />
 
             <MapContainer
@@ -212,24 +220,6 @@ export default function Home() {
                 recommendedSpots={recommendedSpots}
                 selectedRoute={directionsResult?.[selectedRouteIndex]}
                 directionsDestination={directionsDestination}
-            />
-
-            <RightSidebar
-                isOpen={isRecsPanelOpen}
-                onClose={() => {
-                    setIsRecsPanelOpen(false);
-                    setDirectionsDestination(null);
-                    setDirectionsResult([]);
-                }}
-                spots={recommendedSpots}
-                isLoading={isLoading}
-                onGetDirections={handleGetDirections}
-                directionsResult={directionsResult}
-                isDirectionsLoading={isDirectionsLoading}
-                originName={query}
-                directionsDestination={directionsDestination}
-                onSelectRoute={handleSelectRoute}
-                selectedRouteIndex={selectedRouteIndex}
             />
         </main>
     );
