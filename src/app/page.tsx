@@ -10,6 +10,7 @@ import { OdsayRoute } from "@/types/odsay";
 import { Spot } from "@/types/spot";
 import { format } from "date-fns";
 import { getDistance } from "@/lib/distance";
+import { TourDetail } from "@/types/tour";
 
 export default function Home() {
     const [query, setQuery] = useState("서울역");
@@ -28,7 +29,7 @@ export default function Home() {
 
     // 상세 정보 상태 추가
     const [detailedSpot, setDetailedSpot] = useState<Spot | null>(null);
-    const [detailInfo, setDetailInfo] = useState<any | null>(null);
+    const [detailInfo, setDetailInfo] = useState<TourDetail | null>(null);
     const [isDetailLoading, setIsDetailLoading] = useState(false);
 
     useEffect(() => {
@@ -54,7 +55,7 @@ export default function Home() {
                 } else {
                     reject(`'${queryToGeocode}'에 대한 검색 결과가 없습니다.`);
                 }
-            } catch (_error) {
+            } catch {
                 reject("좌표 변환 중 오류가 발생했습니다.");
             }
         });
@@ -159,8 +160,14 @@ export default function Home() {
         setIsDetailLoading(true);
         setDetailInfo(null);
 
+        if (!selectedCategory) {
+            alert("카테고리를 선택해주세요. 상세 정보를 보려면 카테고리 선택이 필요합니다.");
+            setIsDetailLoading(false);
+            return;
+        }
+
         try {
-            const response = await fetch(`/api/tour-details?contentId=${spot.contentId}&contentTypeId=${spot.contentTypeId}`);
+            const response = await fetch(`/api/tour-details?contentId=${spot.contentId}&contentTypeId=${selectedCategory}`);
             if (!response.ok) {
                 throw new Error("상세 정보를 불러오는 데 실패했습니다.");
             }

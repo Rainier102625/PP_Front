@@ -1,18 +1,13 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { X, Loader2, Phone, Clock, Info, ParkingCircle, Utensils, PartyPopper, Bike, BedDouble, ShoppingCart, Star, Wallet, Baby, Dog, Users, Map } from "lucide-react";
+import { X, Loader2, Phone, Clock, Info, ParkingCircle, Utensils, PartyPopper, Bike, BedDouble, ShoppingCart, Wallet, Baby, Dog, Users, Map } from "lucide-react";
 import { Spot } from "@/types/spot";
-
-// 상세 정보 API 응답 타입
-interface DetailInfo {
-    contenttypeid?: string;
-    [key: string]: any;
-}
+import { TourDetail } from "@/types/tour";
 
 interface DetailPanelProps {
     spot: Spot | null;
-    details: DetailInfo | null;
+    details: TourDetail | null;
     isLoading: boolean;
     onClose: () => void;
     onGetDirections: (spot: Spot) => void; // 길찾기 함수 prop 추가
@@ -37,7 +32,7 @@ const getIconForLabel = (label: string) => {
 };
 
 // contenttypeid에 따라 표시할 상세 정보를 객체로 가공하는 함수
-const getDisplayableDetails = (details: DetailInfo | null) => {
+const getDisplayableDetails = (details: TourDetail | null) => {
     if (!details || !details.contenttypeid) return {};
 
     const { contenttypeid } = details;
