@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { X, Loader2, Phone, Clock, Info, ParkingCircle, Utensils, PartyPopper, Bike, BedDouble, ShoppingCart, Star, Wallet, Baby, Dog, Users } from "lucide-react";
+import { X, Loader2, Phone, Clock, Info, ParkingCircle, Utensils, PartyPopper, Bike, BedDouble, ShoppingCart, Star, Wallet, Baby, Dog, Users, Map } from "lucide-react";
 import { Spot } from "@/types/spot";
 
 // 상세 정보 API 응답 타입
@@ -15,6 +15,7 @@ interface DetailPanelProps {
     details: DetailInfo | null;
     isLoading: boolean;
     onClose: () => void;
+    onGetDirections: (spot: Spot) => void; // 길찾기 함수 prop 추가
 }
 
 // 각 라벨에 맞는 아이콘을 반환하는 헬퍼 함수
@@ -186,7 +187,7 @@ const DetailItem = ({ icon, label, value }: { icon: React.ReactNode, label: stri
     );
 };
 
-export function DetailPanel({ spot, details, isLoading, onClose }: DetailPanelProps) {
+export function DetailPanel({ spot, details, isLoading, onClose, onGetDirections }: DetailPanelProps) {
     const displayableDetails = getDisplayableDetails(details);
 
     return (
@@ -226,6 +227,16 @@ export function DetailPanel({ spot, details, isLoading, onClose }: DetailPanelPr
                     </div>
                 )}
             </div>
+            
+            {/* 길찾기 버튼 추가 */}
+            {spot && (
+                <div className="p-4 border-t flex-shrink-0">
+                    <Button className="w-full h-12 text-lg" onClick={() => onGetDirections(spot)}>
+                        <Map size={20} className="mr-2" />
+                        대중교통 길찾기
+                    </Button>
+                </div>
+            )}
         </aside>
     );
 }

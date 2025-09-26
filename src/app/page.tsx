@@ -221,6 +221,7 @@ export default function Home() {
                     details={detailInfo}
                     isLoading={isDetailLoading}
                     onClose={() => setDetailedSpot(null)}
+                    onGetDirections={handleGetDirections} // 함수 전달
                 />
             )}
 
