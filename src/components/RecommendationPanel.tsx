@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Footprints, Loader2, Info } from "lucide-react";
+import { Footprints, Loader2, Info, Map } from "lucide-react"; // Map 아이콘 추가
 import { Spot } from "@/types/spot";
 import Image from "next/image";
 
@@ -52,9 +52,15 @@ export function RecommendationPanel({ spots, isLoading, onGetDirections, onShowD
                                 <Footprints className="w-3 h-3 mr-1"/>
                                 <span>{(spot.distanceMeters / 1000).toFixed(1)}km</span>
                             </div>
-                            <div className="flex space-x-2">
-                                <Button variant="link" size="sm" className="p-0 h-auto text-blue-500" onClick={() => onShowDetails(spot)}>상세보기</Button>
-                                <Button variant="link" size="sm" className="p-0 h-auto text-blue-500" onClick={() => onGetDirections(spot)}>대중교통 길찾기</Button>
+                            <div className="flex items-center space-x-2 pt-2">
+                                <Button size="sm" className="h-8 px-3 bg-black text-white hover:bg-gray-800" onClick={() => onShowDetails(spot)}>
+                                    <Info className="w-4 h-4 mr-1.5" />
+                                    상세보기
+                                </Button>
+                                <Button size="sm" className="h-8 px-3 bg-black text-white hover:bg-gray-800" onClick={() => onGetDirections(spot)}>
+                                    <Map className="w-4 h-4 mr-1.5" />
+                                    길찾기
+                                </Button>
                             </div>
                         </div>
                     </div>
