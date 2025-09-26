@@ -51,12 +51,12 @@ export function RightSidebar({ isOpen, onClose, directionsResult, isDirectionsLo
             </div>
 
             {directionsDestination && (
-                <h2 className="text-lg font-semibold text-gray-700 truncate pb-2 border-b mb-4">
+                <h2 className="text-lg font-semibold text-gray-700 truncate pb-4 border-b mb-4">
                     {originName} → {directionsDestination?.title}
                 </h2>
             )}
 
-            <div className="flex flex-col space-y-2 flex-grow overflow-y-auto pt-2">
+            <div className="flex flex-col space-y-2 flex-grow overflow-y-auto pt-2 min-h-0">
                 {isDirectionsLoading ? (
                      <div className="flex-grow flex items-center justify-center">
                         <div className="text-center">

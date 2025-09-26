@@ -1,9 +1,7 @@
 
-"use client";
-
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Footprints, Loader2 } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Footprints, Loader2, Info } from "lucide-react";
 import { Spot } from "@/types/spot";
 import Image from "next/image";
 
@@ -11,9 +9,10 @@ interface RecommendationPanelProps {
     spots: Spot[];
     isLoading: boolean;
     onGetDirections: (spot: Spot) => void;
+    onShowDetails: (spot: Spot) => void; // 상세보기를 위한 prop 추가
 }
 
-export function RecommendationPanel({ spots, isLoading, onGetDirections }: RecommendationPanelProps) {
+export function RecommendationPanel({ spots, isLoading, onGetDirections, onShowDetails }: RecommendationPanelProps) {
     if (isLoading) {
         return (
             <div className="flex-grow flex items-center justify-center p-4">
@@ -53,7 +52,10 @@ export function RecommendationPanel({ spots, isLoading, onGetDirections }: Recom
                                 <Footprints className="w-3 h-3 mr-1"/>
                                 <span>{(spot.distanceMeters / 1000).toFixed(1)}km</span>
                             </div>
-                            <Button variant="link" size="sm" className="p-0 h-auto text-blue-500" onClick={() => onGetDirections(spot)}>대중교통 길찾기</Button>
+                            <div className="flex space-x-2">
+                                <Button variant="link" size="sm" className="p-0 h-auto text-blue-500" onClick={() => onShowDetails(spot)}>상세보기</Button>
+                                <Button variant="link" size="sm" className="p-0 h-auto text-blue-500" onClick={() => onGetDirections(spot)}>대중교통 길찾기</Button>
+                            </div>
                         </div>
                     </div>
                 </Card>

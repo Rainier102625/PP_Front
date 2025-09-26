@@ -5,13 +5,13 @@ import { Sidebar } from "@/components/Sidebar";
 import { MapContainer } from "@/components/MapContainer";
 import { RightSidebar } from "@/components/RightSidebar";
 import { RecommendationPanel } from "@/components/RecommendationPanel";
+import { DetailPanel } from "@/components/DetailPanel"; // 상세 패널 추가
 import { OdsayRoute } from "@/types/odsay";
 import { Spot } from "@/types/spot";
 import { format } from "date-fns";
 import { getDistance } from "@/lib/distance";
 
 export default function Home() {
-    // 애플리케이션의 핵심 상태들을 관리합니다.
     const [query, setQuery] = useState("서울역");
     const [searchedLocation, setSearchedLocation] = useState<naver.maps.LatLng | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -26,7 +26,11 @@ export default function Home() {
     const [directionsResult, setDirectionsResult] = useState<OdsayRoute[]>([]);
     const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
 
-    // 페이지 로드 시 기본 위치(서울역) 설정
+    // 상세 정보 상태 추가
+    const [detailedSpot, setDetailedSpot] = useState<Spot | null>(null);
+    const [detailInfo, setDetailInfo] = useState<any | null>(null);
+    const [isDetailLoading, setIsDetailLoading] = useState(false);
+
     useEffect(() => {
         if (window.naver) {
             const defaultLocation = new window.naver.maps.LatLng(37.5557, 126.9730);
@@ -34,7 +38,6 @@ export default function Home() {
         }
     }, []);
 
-    // 텍스트 쿼리를 카카오 API를 통해 좌표로 변환하는 함수
     const geocodeQuery = (queryToGeocode: string): Promise<naver.maps.LatLng> => {
         return new Promise(async (resolve, reject) => {
             if (!queryToGeocode.trim()) {
@@ -51,7 +54,7 @@ export default function Home() {
                 } else {
                     reject(`'${queryToGeocode}'에 대한 검색 결과가 없습니다.`);
                 }
-} catch (_error) {
+            } catch (_error) {
                 reject("좌표 변환 중 오류가 발생했습니다.");
             }
         });
@@ -61,10 +64,10 @@ export default function Home() {
         setIsLoading(true);
         setIsRecsPanelOpen(true);
         setRecommendedSpots([]);
-        // 검색 시 경로 결과 초기화
         setDirectionsDestination(null);
         setDirectionsResult([]);
-        setSelectedRouteIndex(0);
+        setDetailedSpot(null); // 상세 정보 패널도 닫기
+        setDetailInfo(null);
 
         try {
             const location = await geocodeQuery(query);
@@ -108,49 +111,23 @@ export default function Home() {
 
     const handleGetDirections = async (spot: Spot) => {
         if (!searchedLocation) {
-            alert("출발지가 설정되지 않았습니다. 먼저 지역을 검색해주세요.");
+            alert("출발지가 설정되지 않았습니다.");
             return;
         }
-
+        setDetailedSpot(null); // 상세 정보 닫기
         setDirectionsDestination(spot);
         setIsDirectionsLoading(true);
         setDirectionsResult([]);
         setSelectedRouteIndex(0);
 
-        const distance = getDistance(
-            searchedLocation.lat(),
-            searchedLocation.lng(),
-            spot.mapY,
-            spot.mapX
-        );
+        const distance = getDistance(searchedLocation.lat(), searchedLocation.lng(), spot.mapY, spot.mapX);
 
         if (distance < 700) {
             const walkingTime = Math.round(distance / 80);
-
             const walkingRoute: OdsayRoute = {
-                pathInfo: {
-                    info: {
-                        totalTime: walkingTime,
-                        payment: 0,
-                        busTransitCount: 0,
-                        subwayTransitCount: 0,
-                        totalDistance: distance,
-                    },
-                    subPath: [
-                        {
-                            trafficType: 3,
-                            distance: distance,
-                            sectionTime: walkingTime,
-                            startX: searchedLocation.lng(),
-                            startY: searchedLocation.lat(),
-                            endX: spot.mapX,
-                            endY: spot.mapY,
-                        },
-                    ],
-                },
+                pathInfo: { info: { totalTime: walkingTime, payment: 0, busTransitCount: 0, subwayTransitCount: 0, totalDistance: distance }, subPath: [{ trafficType: 3, distance: distance, sectionTime: walkingTime, startX: searchedLocation.lng(), startY: searchedLocation.lat(), endX: spot.mapX, endY: spot.mapY }] },
                 geometry: null,
             };
-
             setDirectionsResult([walkingRoute]);
             setIsDirectionsLoading(false);
             return;
@@ -167,14 +144,35 @@ export default function Home() {
             data.sort((a: OdsayRoute, b: OdsayRoute) => a.pathInfo.info.totalTime - b.pathInfo.info.totalTime);
             setDirectionsResult(data);
         } catch (e) {
-            if (e instanceof Error) {
-                alert(e.message);
-            } else {
-                alert('경로를 가져오는 중 알 수 없는 오류가 발생했습니다.');
-            }
+            if (e instanceof Error) alert(e.message);
+            else alert('경로를 가져오는 중 알 수 없는 오류가 발생했습니다.');
             setDirectionsDestination(null);
         } finally {
             setIsDirectionsLoading(false);
+        }
+    };
+
+    // 상세 정보 가져오기 핸들러
+    const handleShowDetails = async (spot: Spot) => {
+        setDirectionsDestination(null); // 길찾기 닫기
+        setDetailedSpot(spot);
+        setIsDetailLoading(true);
+        setDetailInfo(null);
+
+        try {
+            const response = await fetch(`/api/tour-details?contentId=${spot.contentId}&contentTypeId=${spot.contentTypeId}`);
+            if (!response.ok) {
+                throw new Error("상세 정보를 불러오는 데 실패했습니다.");
+            }
+            const data = await response.json();
+            console.log("Tour API Response:", data); // 데이터 구조 확인을 위한 로그 추가
+            setDetailInfo(data[0]); // 배열의 첫 번째 항목을 사용
+        } catch (e) {
+            if (e instanceof Error) alert(e.message);
+            else alert("상세 정보를 가져오는 중 알 수 없는 오류가 발생했습니다.");
+            setDetailedSpot(null);
+        } finally {
+            setIsDetailLoading(false);
         }
     };
 
@@ -200,20 +198,31 @@ export default function Home() {
                         isLoading={isLoading}
                         spots={recommendedSpots}
                         onGetDirections={handleGetDirections}
+                        onShowDetails={handleShowDetails} // 핸들러 전달
                     />
                 )}
             </div>
 
-            <RightSidebar
-                isOpen={!!directionsDestination}
-                onClose={() => setDirectionsDestination(null)}
-                directionsResult={directionsResult}
-                isDirectionsLoading={isDirectionsLoading}
-                originName={query}
-                directionsDestination={directionsDestination}
-                onSelectRoute={handleSelectRoute}
-                selectedRouteIndex={selectedRouteIndex}
-            />
+            {/* 길찾기 또는 상세 정보 패널 (하나만 표시) */}
+            {directionsDestination ? (
+                <RightSidebar
+                    isOpen={!!directionsDestination}
+                    onClose={() => setDirectionsDestination(null)}
+                    directionsResult={directionsResult}
+                    isDirectionsLoading={isDirectionsLoading}
+                    originName={query}
+                    directionsDestination={directionsDestination}
+                    onSelectRoute={handleSelectRoute}
+                    selectedRouteIndex={selectedRouteIndex}
+                />
+            ) : detailedSpot && (
+                <DetailPanel
+                    spot={detailedSpot}
+                    details={detailInfo}
+                    isLoading={isDetailLoading}
+                    onClose={() => setDetailedSpot(null)}
+                />
+            )}
 
             <MapContainer
                 searchedLocation={searchedLocation}
