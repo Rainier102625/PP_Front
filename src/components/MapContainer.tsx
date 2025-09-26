@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, memo } from "react";
 import { Spot } from "@/types/spot";
 import { OdsayRoute } from "@/types/odsay";
 
@@ -11,7 +11,7 @@ interface MapContainerProps {
     directionsDestination: Spot | null;
 }
 
-export function MapContainer({ searchedLocation, recommendedSpots, selectedRoute, directionsDestination }: MapContainerProps) {
+const MapContainerComponent = ({ searchedLocation, recommendedSpots, selectedRoute, directionsDestination }: MapContainerProps) => {
     const mapElement = useRef<HTMLDivElement>(null);
     const mapRef = useRef<naver.maps.Map | null>(null);
     const mainMarkerRef = useRef<naver.maps.Marker | null>(null);
@@ -219,4 +219,6 @@ export function MapContainer({ searchedLocation, recommendedSpots, selectedRoute
             </div>
         </section>
     );
-}
+};
+
+export const MapContainer = memo(MapContainerComponent);

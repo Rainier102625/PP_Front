@@ -1,5 +1,4 @@
-"use client";
-
+import { memo } from 'react';
 import { Button } from "@/components/ui/button";
 import { X, Loader2, Phone, Clock, Info, ParkingCircle, Utensils, PartyPopper, Bike, BedDouble, ShoppingCart, Wallet, Baby, Dog, Users, Map } from "lucide-react";
 import { Spot } from "@/types/spot";
@@ -36,7 +35,7 @@ const getDisplayableDetails = (details: TourDetail | null) => {
     if (!details || !details.contenttypeid) return {};
 
     const { contenttypeid } = details;
-    let fields = {};
+    let fields: Record<string, string | undefined> = {};
 
     switch (contenttypeid) {
         case '12': // 관광지
@@ -161,7 +160,7 @@ const getDisplayableDetails = (details: TourDetail | null) => {
     }, {} as Record<string, string>);
 };
 
-const DetailItem = ({ icon, label, value }: { icon: React.ReactNode, label: string, value: string }) => {
+const DetailItem = memo(({ icon, label, value }: { icon: React.ReactNode, label: string, value: string }) => {
     // 값의 URL 여부를 간단히 확인
     const isUrl = typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://'));
 
@@ -180,9 +179,10 @@ const DetailItem = ({ icon, label, value }: { icon: React.ReactNode, label: stri
             </div>
         </div>
     );
-};
+});
+DetailItem.displayName = 'DetailItem';
 
-export function DetailPanel({ spot, details, isLoading, onClose, onGetDirections }: DetailPanelProps) {
+const DetailPanelComponent = ({ spot, details, isLoading, onClose, onGetDirections }: DetailPanelProps) => {
     const displayableDetails = getDisplayableDetails(details);
 
     return (
@@ -234,4 +234,6 @@ export function DetailPanel({ spot, details, isLoading, onClose, onGetDirections
             )}
         </aside>
     );
-}
+};
+
+export const DetailPanel = memo(DetailPanelComponent);

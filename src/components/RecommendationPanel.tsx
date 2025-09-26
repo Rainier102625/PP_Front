@@ -1,4 +1,5 @@
 
+import { memo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Footprints, Loader2, Info, Map } from "lucide-react"; // Map 아이콘 추가
@@ -12,7 +13,7 @@ interface RecommendationPanelProps {
     onShowDetails: (spot: Spot) => void; // 상세보기를 위한 prop 추가
 }
 
-export function RecommendationPanel({ spots, isLoading, onGetDirections, onShowDetails }: RecommendationPanelProps) {
+const RecommendationPanelComponent = ({ spots, isLoading, onGetDirections, onShowDetails }: RecommendationPanelProps) => {
     if (isLoading) {
         return (
             <div className="flex-grow flex items-center justify-center p-4">
@@ -68,4 +69,6 @@ export function RecommendationPanel({ spots, isLoading, onGetDirections, onShowD
             ))}
         </div>
     );
-}
+};
+
+export const RecommendationPanel = memo(RecommendationPanelComponent);

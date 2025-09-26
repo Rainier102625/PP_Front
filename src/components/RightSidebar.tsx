@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { X, Bus, TrainFront, PersonStanding, Loader2 } from "lucide-react";
@@ -36,7 +37,7 @@ const renderSubPath = (subPath: SubPath, index: number) => {
     );
 };
 
-export function RightSidebar({ isOpen, onClose, directionsResult, isDirectionsLoading, directionsDestination, originName, onSelectRoute, selectedRouteIndex }: DirectionsPanelProps) {
+const RightSidebarComponent = ({ isOpen, onClose, directionsResult, isDirectionsLoading, directionsDestination, originName, onSelectRoute, selectedRouteIndex }: DirectionsPanelProps) => {
     if (!isOpen) {
         return null;
     }
@@ -88,4 +89,6 @@ export function RightSidebar({ isOpen, onClose, directionsResult, isDirectionsLo
             </div>
         </aside>
     );
-}
+};
+
+export const RightSidebar = memo(RightSidebarComponent);

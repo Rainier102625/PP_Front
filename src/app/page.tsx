@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { MapContainer } from "@/components/MapContainer";
 import { RightSidebar } from "@/components/RightSidebar";
@@ -39,7 +39,7 @@ export default function Home() {
         }
     }, []);
 
-    const geocodeQuery = (queryToGeocode: string): Promise<naver.maps.LatLng> => {
+    const geocodeQuery = useCallback((queryToGeocode: string): Promise<naver.maps.LatLng> => {
         return new Promise(async (resolve, reject) => {
             if (!queryToGeocode.trim()) {
                 reject("검색어가 없습니다.");
@@ -59,9 +59,9 @@ export default function Home() {
                 reject("좌표 변환 중 오류가 발생했습니다.");
             }
         });
-    };
+    }, []);
 
-    const handleSearch = async () => {
+    const handleSearch = useCallback(async () => {
         setIsLoading(true);
         setIsRecsPanelOpen(true);
         setRecommendedSpots([]);
@@ -108,9 +108,9 @@ export default function Home() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [query, selectedCategory, selectedTime, geocodeQuery]);
 
-    const handleGetDirections = async (spot: Spot) => {
+    const handleGetDirections = useCallback(async (spot: Spot) => {
         if (!searchedLocation) {
             alert("출발지가 설정되지 않았습니다.");
             return;
@@ -151,10 +151,10 @@ export default function Home() {
         } finally {
             setIsDirectionsLoading(false);
         }
-    };
+    }, [searchedLocation]);
 
     // 상세 정보 가져오기 핸들러
-    const handleShowDetails = async (spot: Spot) => {
+    const handleShowDetails = useCallback(async (spot: Spot) => {
         setDirectionsDestination(null); // 길찾기 닫기
         setDetailedSpot(spot);
         setIsDetailLoading(true);
@@ -181,11 +181,11 @@ export default function Home() {
         } finally {
             setIsDetailLoading(false);
         }
-    };
+    }, [selectedCategory]);
 
-    const handleSelectRoute = (index: number) => {
+    const handleSelectRoute = useCallback((index: number) => {
         setSelectedRouteIndex(index);
-    };
+    }, []);
 
     return (
         <main className="flex h-screen w-screen">

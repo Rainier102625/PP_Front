@@ -1,6 +1,6 @@
 "use client";
 
-import {useState, useEffect, useRef} from "react";
+import {useState, useEffect, useRef, memo} from "react";
 import {Search, Loader2, MapPin} from "lucide-react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
@@ -39,7 +39,7 @@ export const categories = [
     { id: "39", name: "음식점" },
 ];
 
-export function Sidebar({
+const SidebarComponent = ({
     onSearch,
     setSearchedLocation,
     selectedCategory,
@@ -48,7 +48,7 @@ export function Sidebar({
     onTimeChange,
     onQueryChange,
     query
-}: SidebarProps) {
+}: SidebarProps) => {
 
     const [suggestions, setSuggestions] = useState<AutoCompleteItem[]>([]);
     const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -220,4 +220,6 @@ export function Sidebar({
             </div>
         </aside>
     );
-}
+};
+
+export const Sidebar = memo(SidebarComponent);
