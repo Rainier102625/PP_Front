@@ -160,14 +160,8 @@ export default function Home() {
         setIsDetailLoading(true);
         setDetailInfo(null);
 
-        if (!selectedCategory) {
-            alert("카테고리를 선택해주세요. 상세 정보를 보려면 카테고리 선택이 필요합니다.");
-            setIsDetailLoading(false);
-            return;
-        }
-
         try {
-            const response = await fetch(`/api/tour-details?contentId=${spot.contentId}&contentTypeId=${selectedCategory}`);
+            const response = await fetch(`/api/tour-details?contentId=${spot.contentId}&contentTypeId=${spot.contentTypeId}`);
             if (!response.ok) {
                 throw new Error("상세 정보를 불러오는 데 실패했습니다.");
             }
@@ -181,7 +175,7 @@ export default function Home() {
         } finally {
             setIsDetailLoading(false);
         }
-    }, [selectedCategory]);
+    }, []);
 
     const handleSelectRoute = useCallback((index: number) => {
         setSelectedRouteIndex(index);
