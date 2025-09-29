@@ -1,7 +1,8 @@
 "use client";
 
 import {useState, useEffect, useRef, memo} from "react";
-import {Search, Loader2, MapPin} from "lucide-react";
+import {Search, Loader2, MapPin, UserCircle} from "lucide-react";
+import Link from "next/link";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
 import {Card} from "@/components/ui/card";
@@ -144,7 +145,14 @@ const SidebarComponent = ({
 
     return (
         <aside className="h-full bg-white border-r p-4 space-y-4 flex flex-col z-20 shadow-lg">
-            <h1 className="text-2xl font-bold">여행지 추천 검색</h1>
+            <div className="flex justify-between items-center">
+                <h1 className="text-2xl font-bold">여행지 추천 검색</h1>
+                <Link href="/login">
+                    <Button variant="outline" size="icon">
+                        <UserCircle className="h-5 w-5" />
+                    </Button>
+                </Link>
+            </div>
 
             <div className="flex items-center gap-2">
                 <div className="relative w-full" ref={searchContainerRef}>
