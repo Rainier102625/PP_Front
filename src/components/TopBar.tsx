@@ -2,18 +2,20 @@
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useRouter } from 'next/navigation';
 
 interface TopBarProps {
     query: string;
     onQueryChange: (value: string) => void;
-    onSearch: () => void;
     onMenuClick: () => void;
 }
 
-export function TopBar({ query, onQueryChange, onSearch, onMenuClick }: TopBarProps) {
+export function TopBar({ query, onQueryChange, onMenuClick }: TopBarProps) {
+    const router = useRouter();
+
     const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
         if (event.key === 'Enter') {
-            onSearch();
+            router.push('/search');
         }
     };
 
@@ -29,11 +31,9 @@ export function TopBar({ query, onQueryChange, onSearch, onMenuClick }: TopBarPr
                     value={query}
                     onChange={(e) => onQueryChange(e.target.value)}
                     onKeyDown={handleKeyDown}
+                    onClick={() => router.push('/search')}
                     className="flex-grow bg-transparent border-none focus:ring-0 text-lg"
                 />
-                <Button variant="ghost" size="icon" onClick={onSearch} className="flex-shrink-0 rounded-full">
-                    <img src="/search.svg" alt="Search" />
-                </Button>
             </div>
         </div>
     );

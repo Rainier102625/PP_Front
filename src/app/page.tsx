@@ -11,10 +11,13 @@ import { Spot } from "@/types/spot";
 import { format } from "date-fns";
 import { getDistance } from "@/lib/distance";
 import { TourDetail } from "@/types/tour";
-import { TopBar } from "@/components/TopBar"; // TopBar import
+import { TopBar } from "@/components/TopBar";
+import { useSearchParams } from 'next/navigation';
 
 export default function Home() {
-    const [query, setQuery] = useState("서울역");
+    const searchParams = useSearchParams();
+
+    const [query, setQuery] = useState("");
     const [searchedLocation, setSearchedLocation] = useState<naver.maps.LatLng | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [selectedTime, setSelectedTime] = useState<string>("13:30");
@@ -32,14 +35,7 @@ export default function Home() {
     const [detailInfo, setDetailInfo] = useState<TourDetail | null>(null);
     const [isDetailLoading, setIsDetailLoading] = useState(false);
 
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Sidebar 표시 상태
-
-    useEffect(() => {
-        if (window.naver) {
-            const defaultLocation = new window.naver.maps.LatLng(37.5557, 126.9730);
-            setSearchedLocation(defaultLocation);
-        }
-    }, []);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const geocodeQuery = useCallback((queryToGeocode: string): Promise<naver.maps.LatLng> => {
         return new Promise(async (resolve, reject) => {
@@ -63,8 +59,11 @@ export default function Home() {
         });
     }, []);
 
-    const handleSearch = useCallback(async () => {
-        setIsSidebarOpen(false); // 검색 시작 시 사이드바 닫기
+    const handleSearch = useCallback(async (searchQueryParam?: string) => {
+        const currentQuery = searchQueryParam || query; // Use param if provided, else state
+        if (!currentQuery) return; // Prevent searching with empty query
+
+        setIsSidebarOpen(false);
         setIsLoading(true);
         setIsRecsPanelOpen(true);
         setRecommendedSpots([]);
@@ -74,7 +73,7 @@ export default function Home() {
         setDetailInfo(null);
 
         try {
-            const location = await geocodeQuery(query);
+            const location = await geocodeQuery(currentQuery);
             setSearchedLocation(location);
 
             const finalDateTime = new Date();
@@ -112,6 +111,21 @@ export default function Home() {
             setIsLoading(false);
         }
     }, [query, selectedCategory, selectedTime, geocodeQuery]);
+
+    useEffect(() => {
+        if (window.naver) {
+            const defaultLocation = new window.naver.maps.LatLng(37.5557, 126.9730);
+            setSearchedLocation(defaultLocation);
+
+            const urlQuery = searchParams.get('query');
+            if (urlQuery) {
+                setQuery(urlQuery);
+                handleSearch(urlQuery);
+            } else {
+                handleSearch(query); // Initial search with default "서울역"
+            }
+        }
+    }, [searchParams, handleSearch, query]);
 
     const handleGetDirections = useCallback(async (spot: Spot) => {
         if (!searchedLocation) {
@@ -189,13 +203,12 @@ export default function Home() {
             <TopBar
                 query={query}
                 onQueryChange={setQuery}
-                onSearch={handleSearch}
                 onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)}
             />
 
             {isSidebarOpen && (
                 <>
-                    {/* Backdrop for mobile */} 
+                    {/* Backdrop for mobile */}
                     <div className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden" onClick={() => setIsSidebarOpen(false)}></div>
                     <div className="fixed inset-y-0 left-0 w-[380px] flex flex-col h-full shadow-lg z-50 bg-white transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0">
                         <Sidebar
