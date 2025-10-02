@@ -92,7 +92,7 @@ const SearchPage: FunctionComponent = () => {
           <h3 className="text-lg font-semibold mb-4">최근 검색</h3>
           <div className="space-y-3">
             {recentSearches.map((item, index) => (
-              <Card key={index} className="flex items-center p-3 space-x-3">
+              <Card key={index} className="flex items-center p-3 space-x-3 w-full">
                 <MapPin className="w-5 h-5 text-gray-500 flex-shrink-0" />
                 <div className="flex-grow">
                   <p className="font-medium text-base">{item.name}</p>
@@ -109,7 +109,7 @@ const SearchPage: FunctionComponent = () => {
           <h3 className="text-lg font-semibold mb-4">인기 검색</h3>
           <div className="space-y-3">
             {popularSearches.map((item, index) => (
-              <Card key={index} className="flex items-center p-3 space-x-3">
+              <Card key={index} className="flex items-center p-3 space-x-3 w-full">
                 <MapPin className="w-5 h-5 text-gray-500 flex-shrink-0" />
                 <div className="flex-grow">
                   <p className="font-medium text-base">{item.name}</p>

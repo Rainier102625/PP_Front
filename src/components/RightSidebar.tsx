@@ -7,7 +7,7 @@ import { X, Bus, TrainFront, PersonStanding, Loader2 } from "lucide-react";
 import { OdsayRoute, SubPath } from "@/types/odsay";
 import { Spot } from "@/types/spot";
 
-interface DirectionsPanelProps {
+interface RightSidebarProps {
     isOpen: boolean;
     onClose: () => void;
     directionsResult: OdsayRoute[];
