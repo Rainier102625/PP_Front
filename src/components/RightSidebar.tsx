@@ -37,17 +37,24 @@ const renderSubPath = (subPath: SubPath, index: number) => {
     );
 };
 
-const RightSidebarComponent = ({ isOpen, onClose, directionsResult, isDirectionsLoading, directionsDestination, originName, onSelectRoute, selectedRouteIndex }: DirectionsPanelProps) => {
-    if (!isOpen) {
-        return null;
-    }
-
+const RightSidebarComponent = ({
+    isOpen,
+    onClose,
+    directionsResult,
+    isDirectionsLoading,
+    originName,
+    directionsDestination,
+    onSelectRoute,
+    selectedRouteIndex,
+}: RightSidebarProps) => {
     return (
-        <aside className="w-[380px] h-full bg-white border-r border-gray-200 flex flex-col p-4 shadow-lg">
-            <div className="flex justify-between items-center mb-2">
-                <h1 className="text-2xl font-bold text-gray-800">경로 결과</h1>
+        <aside className={`fixed inset-y-0 right-0 w-full md:w-[400px] bg-white shadow-lg z-30 flex flex-col h-full
+                          transform transition-transform duration-300 ease-in-out
+                          ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="p-4 border-b flex items-center justify-between">
+                <h2 className="text-xl font-bold">길찾기 결과</h2>
                 <Button variant="ghost" size="icon" onClick={onClose}>
-                    <X className="w-6 h-6" />
+                    <X className="h-5 w-5" />
                 </Button>
             </div>
 

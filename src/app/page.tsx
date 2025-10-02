@@ -5,12 +5,13 @@ import { Sidebar } from "@/components/Sidebar";
 import { MapContainer } from "@/components/MapContainer";
 import { RightSidebar } from "@/components/RightSidebar";
 import { RecommendationPanel } from "@/components/RecommendationPanel";
-import { DetailPanel } from "@/components/DetailPanel"; // 상세 패널 추가
+import { DetailPanel } from "@/components/DetailPanel";
 import { OdsayRoute } from "@/types/odsay";
 import { Spot } from "@/types/spot";
 import { format } from "date-fns";
 import { getDistance } from "@/lib/distance";
 import { TourDetail } from "@/types/tour";
+import { TopBar } from "@/components/TopBar"; // TopBar import
 
 export default function Home() {
     const [query, setQuery] = useState("서울역");
@@ -27,10 +28,11 @@ export default function Home() {
     const [directionsResult, setDirectionsResult] = useState<OdsayRoute[]>([]);
     const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
 
-    // 상세 정보 상태 추가
     const [detailedSpot, setDetailedSpot] = useState<Spot | null>(null);
     const [detailInfo, setDetailInfo] = useState<TourDetail | null>(null);
     const [isDetailLoading, setIsDetailLoading] = useState(false);
+
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Sidebar 표시 상태
 
     useEffect(() => {
         if (window.naver) {
@@ -62,12 +64,13 @@ export default function Home() {
     }, []);
 
     const handleSearch = useCallback(async () => {
+        setIsSidebarOpen(false); // 검색 시작 시 사이드바 닫기
         setIsLoading(true);
         setIsRecsPanelOpen(true);
         setRecommendedSpots([]);
         setDirectionsDestination(null);
         setDirectionsResult([]);
-        setDetailedSpot(null); // 상세 정보 패널도 닫기
+        setDetailedSpot(null);
         setDetailInfo(null);
 
         try {
@@ -115,7 +118,8 @@ export default function Home() {
             alert("출발지가 설정되지 않았습니다.");
             return;
         }
-        setDetailedSpot(null); // 상세 정보 닫기
+        setIsSidebarOpen(false);
+        setDetailedSpot(null);
         setDirectionsDestination(spot);
         setIsDirectionsLoading(true);
         setDirectionsResult([]);
@@ -153,9 +157,9 @@ export default function Home() {
         }
     }, [searchedLocation]);
 
-    // 상세 정보 가져오기 핸들러
     const handleShowDetails = useCallback(async (spot: Spot) => {
-        setDirectionsDestination(null); // 길찾기 닫기
+        setIsSidebarOpen(false);
+        setDirectionsDestination(null);
         setDetailedSpot(spot);
         setIsDetailLoading(true);
         setDetailInfo(null);
@@ -166,8 +170,7 @@ export default function Home() {
                 throw new Error("상세 정보를 불러오는 데 실패했습니다.");
             }
             const data = await response.json();
-            console.log("Tour API Response:", data); // 데이터 구조 확인을 위한 로그 추가
-            setDetailInfo(data[0]); // 배열의 첫 번째 항목을 사용
+            setDetailInfo(data[0]);
         } catch (e) {
             if (e instanceof Error) alert(e.message);
             else alert("상세 정보를 가져오는 중 알 수 없는 오류가 발생했습니다.");
@@ -182,29 +185,37 @@ export default function Home() {
     }, []);
 
     return (
-        <main className="flex h-screen w-screen">
-            <div className="w-[380px] flex flex-col h-full shadow-lg z-20 bg-white">
-                <Sidebar
-                    query={query}
-                    onQueryChange={setQuery}
-                    setSearchedLocation={setSearchedLocation}
-                    onSearch={handleSearch}
-                    selectedCategory={selectedCategory}
-                    onCategoryChange={setSelectedCategory}
-                    time={selectedTime}
-                    onTimeChange={setSelectedTime}
-                />
-                {isRecsPanelOpen && (
-                    <RecommendationPanel
-                        isLoading={isLoading}
-                        spots={recommendedSpots}
-                        onGetDirections={handleGetDirections}
-                        onShowDetails={handleShowDetails} // 핸들러 전달
-                    />
-                )}
-            </div>
+        <main className="relative h-screen w-screen overflow-hidden">
+            <TopBar
+                query={query}
+                onQueryChange={setQuery}
+                onSearch={handleSearch}
+                onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            />
 
-            {/* 길찾기 또는 상세 정보 패널 (하나만 표시) */}
+            {isSidebarOpen && (
+                <>
+                    {/* Backdrop for mobile */} 
+                    <div className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden" onClick={() => setIsSidebarOpen(false)}></div>
+                    <div className="fixed inset-y-0 left-0 w-[380px] flex flex-col h-full shadow-lg z-50 bg-white transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0">
+                        <Sidebar
+                            selectedCategory={selectedCategory}
+                            onCategoryChange={setSelectedCategory}
+                            time={selectedTime}
+                            onTimeChange={setSelectedTime}
+                        />
+                        {isRecsPanelOpen && (
+                            <RecommendationPanel
+                                isLoading={isLoading}
+                                spots={recommendedSpots}
+                                onGetDirections={handleGetDirections}
+                                onShowDetails={handleShowDetails}
+                            />
+                        )}
+                    </div>
+                </>
+            )}
+
             {directionsDestination ? (
                 <RightSidebar
                     isOpen={!!directionsDestination}
@@ -214,7 +225,6 @@ export default function Home() {
                     originName={query}
                     directionsDestination={directionsDestination}
                     onSelectRoute={handleSelectRoute}
-                    selectedRouteIndex={selectedRouteIndex}
                 />
             ) : detailedSpot && (
                 <DetailPanel
@@ -222,7 +232,7 @@ export default function Home() {
                     details={detailInfo}
                     isLoading={isDetailLoading}
                     onClose={() => setDetailedSpot(null)}
-                    onGetDirections={handleGetDirections} // 함수 전달
+                    onGetDirections={handleGetDirections}
                 />
             )}
 

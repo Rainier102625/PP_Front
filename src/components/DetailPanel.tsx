@@ -186,7 +186,9 @@ const DetailPanelComponent = ({ spot, details, isLoading, onClose, onGetDirectio
     const displayableDetails = getDisplayableDetails(details);
 
     return (
-        <aside className="w-[380px] h-full bg-white border-r border-gray-200 flex flex-col p-4 shadow-lg">
+        <aside className={`fixed inset-y-0 right-0 w-full md:w-[380px] h-full bg-white border-r border-gray-200 flex flex-col p-4 shadow-lg
+                          transform transition-transform duration-300 ease-in-out
+                          ${spot ? 'translate-x-0' : 'translate-x-full'}`}>
             <div className="flex justify-between items-center mb-2 flex-shrink-0">
                 <h1 className="text-2xl font-bold text-gray-800">상세 정보</h1>
                 <Button variant="ghost" size="icon" onClick={onClose}>
