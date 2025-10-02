@@ -1,16 +1,15 @@
+"use client";
+
+import { memo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { X, Bus, TrainFront, PersonStanding, Footprints } from "lucide-react";
+import { X, Bus, TrainFront, PersonStanding, Loader2 } from "lucide-react";
 import { OdsayRoute, SubPath } from "@/types/odsay";
 import { Spot } from "@/types/spot";
-import Image from "next/image";
 
 interface RightSidebarProps {
     isOpen: boolean;
     onClose: () => void;
-    spots: Spot[];
-    isLoading: boolean;
-    onGetDirections: (spot: Spot) => void;
     directionsResult: OdsayRoute[];
     isDirectionsLoading: boolean;
     directionsDestination: Spot | null;
@@ -38,86 +37,65 @@ const renderSubPath = (subPath: SubPath, index: number) => {
     );
 };
 
-export function RightSidebar({ isOpen, onClose, spots, isLoading, onGetDirections, directionsResult, isDirectionsLoading, directionsDestination, originName, onSelectRoute, selectedRouteIndex }: RightSidebarProps) {
-    if (!isOpen) {
-        return null;
-    }
-
-    const hasDirections = directionsResult.length > 0 && directionsDestination;
-
+const RightSidebarComponent = ({
+    isOpen,
+    onClose,
+    directionsResult,
+    isDirectionsLoading,
+    originName,
+    directionsDestination,
+    onSelectRoute,
+    selectedRouteIndex,
+}: RightSidebarProps) => {
     return (
-        <aside className="absolute top-0 right-0 w-[380px] h-full bg-white border-l border-gray-200 flex flex-col p-4 z-10 shadow-lg">
-            <div className="flex justify-between items-center mb-2">
-                <h1 className="text-2xl font-bold text-gray-800">{directionsDestination ? "경로 결과" : "추천 장소"}</h1>
+        <aside className={`fixed inset-y-0 right-0 w-full md:w-[400px] bg-white shadow-lg z-30 flex flex-col h-full
+                          transform transition-transform duration-300 ease-in-out
+                          ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="p-4 border-b flex items-center justify-between">
+                <h2 className="text-xl font-bold">길찾기 결과</h2>
                 <Button variant="ghost" size="icon" onClick={onClose}>
-                    <X className="w-6 h-6" />
+                    <X className="h-5 w-5" />
                 </Button>
             </div>
 
             {directionsDestination && (
-                <h2 className="text-lg font-semibold text-gray-700 truncate pb-2 border-b mb-4">
+                <h2 className="text-lg font-semibold text-gray-700 truncate pb-4 border-b mb-4">
                     {originName} → {directionsDestination?.title}
                 </h2>
             )}
 
-            {directionsDestination ? (
-                <div className="flex flex-col space-y-2 flex-grow overflow-y-auto pt-2">
-                    {isDirectionsLoading ? (
-                        <p>경로를 검색 중입니다...</p>
-                    ) : hasDirections ? (
-                        <div className="space-y-3">
-                            {directionsResult.map((route, index) => (
-                                <Card key={index} className="cursor-pointer transition-all" onClick={() => onSelectRoute(index)}>
-                                    <div className="p-3 font-semibold flex justify-between items-center">
-                                        <span>경로 {index + 1}</span>
-                                        <span className="text-blue-600">{route.pathInfo.info.totalTime}분 소요</span>
-                                    </div>
-                                    {selectedRouteIndex === index && (
-                                        <div className="border-t p-3 bg-gray-50/50">
-                                            <div className="space-y-1">
-                                                {route.pathInfo.subPath.map(renderSubPath)}
-                                            </div>
-                                        </div>
-                                    )}
-                                </Card>
-                            ))}
+            <div className="flex flex-col space-y-2 flex-grow overflow-y-auto pt-2 min-h-0">
+                {isDirectionsLoading ? (
+                     <div className="flex-grow flex items-center justify-center">
+                        <div className="text-center">
+                            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                            <p>경로를 검색 중입니다...</p>
                         </div>
-                    ) : (
-                        <p>검색된 경로가 없습니다.</p>
-                    )}
-                </div>
-            ) : isLoading ? (
-                <div className="flex-grow flex items-center justify-center">
-                    <p>데이터를 불러오는 중입니다...</p>
-                </div>
-            ) : (
-                <div className="overflow-y-auto">
-                    {spots.length === 0 ? (
-                        <p>추천 장소가 없습니다.</p>
-                    ) : (
-                        <div className="space-y-3">
-                            {spots.map((spot, index) => (
-                                <Card key={index} className="p-3 hover:bg-gray-50 cursor-pointer">
-                                    <div className="flex items-center space-x-3">
-                                        {spot.firstImage && (
-                                            <Image src={spot.firstImage} alt={spot.title} width={64} height={64} className="w-16 h-16 rounded-md object-cover bg-gray-100" />
-                                        )}
-                                        <div className="flex-grow">
-                                            <p className="font-semibold text-gray-800">{spot.title}</p>
-                                            <p className="text-xs text-gray-500">{spot.addr1}</p>
-                                            <div className="flex items-center text-xs text-gray-500 mt-1">
-                                                <Footprints className="w-3 h-3 mr-1"/>
-                                                <span>{(spot.distanceMeters / 1000).toFixed(1)}km</span>
-                                            </div>
-                                            <Button variant="link" size="sm" className="p-0 h-auto text-blue-500" onClick={() => onGetDirections(spot)}>대중교통 길찾기</Button>
+                    </div>
+                ) : directionsResult.length > 0 ? (
+                    <div className="space-y-3">
+                        {directionsResult.map((route, index) => (
+                            <Card key={index} className="cursor-pointer transition-all" onClick={() => onSelectRoute(index)}>
+                                <div className="p-3 font-semibold flex justify-between items-center">
+                                    <span>경로 {index + 1}</span>
+                                    <span className="text-blue-600">{route.pathInfo.info.totalTime}분 소요</span>
+                                </div>
+                                {selectedRouteIndex === index && (
+                                    <div className="border-t p-3 bg-gray-50/50">
+                                        <div className="space-y-1">
+                                            {route.pathInfo.subPath.map(renderSubPath)}
                                         </div>
                                     </div>
-                                </Card>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
+                                )}
+                            </Card>
+                        ))}
+                    </div>
+                ) : (
+                    <p>검색된 경로가 없습니다.</p>
+                )}
+            </div>
         </aside>
     );
-}
+};
+
+export const RightSidebar = memo(RightSidebarComponent);

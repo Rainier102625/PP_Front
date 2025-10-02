@@ -1,0 +1,391 @@
+.div {
+  width: 100%;
+  position: relative;
+  background-color: #fff;
+  border: 5px solid #000;
+  box-sizing: border-box;
+  height: 852px;
+  text-align: left;
+  font-size: 12px;
+  color: #0a0a0a;
+  font-family: Arimo;
+}
+
+.div2 {
+  flex: 1;
+  position: relative;
+  line-height: 16px;
+}
+
+.div7 {
+  position: relative;
+}
+
+.searchmodal {
+  position: absolute;
+  top: 0px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #fff;
+  width: 393px;
+  height: 852px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  font-size: 16px;
+  color: #717182;
+}
+.container20 {
+  align-self: stretch;
+  position: relative;
+  background-color: #fff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+  height: 69px;
+}
+.container21 {
+  position: absolute;
+  top: 16px;
+  left: 68px;
+  width: 309px;
+  height: 36px;
+}
+.divInput {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  border-radius: 8px;
+  background-color: #f9fafb;
+  width: 309px;
+  height: 36px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  padding: 4px 12px 4px 40px;
+  box-sizing: border-box;
+}
+.containerChild {
+  position: absolute;
+  top: 10.94px;
+  left: 300.72px;
+  width: 22.1px;
+  height: 16.9px;
+}
+.container22 {
+  align-self: stretch;
+  height: 783px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 16px 16px 0px;
+  box-sizing: border-box;
+  gap: 24px;
+  color: #0a0a0a;
+}
+.container23 {
+  align-self: stretch;
+  height: 268px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+.heading3 {
+  align-self: stretch;
+  position: relative;
+  height: 24px;
+}
+.div9 {
+  position: absolute;
+  top: -2px;
+  left: 0px;
+  line-height: 24px;
+}
+.container24 {
+  align-self: stretch;
+  position: relative;
+  height: 228px;
+  font-size: 14px;
+}
+.button {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  border-radius: 10px;
+  width: 112.3px;
+  height: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0px;
+  box-sizing: border-box;
+  gap: 8px;
+}
+.containerIcon {
+  width: 48px;
+  flex: 1;
+  border-radius: 33554400px;
+  max-height: 100%;
+}
+.text {
+  width: 28px;
+  position: relative;
+  height: 20px;
+}
+.div10 {
+  position: absolute;
+  top: -1px;
+  left: 0px;
+  line-height: 20px;
+}
+.divButton {
+  position: absolute;
+  top: 0px;
+  left: 124.33px;
+  border-radius: 10px;
+  width: 112.3px;
+  height: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0px;
+  box-sizing: border-box;
+  gap: 8px;
+}
+.divText {
+  width: 42px;
+  position: relative;
+  height: 20px;
+}
+.button2 {
+  position: absolute;
+  top: 0px;
+  left: 248.66px;
+  border-radius: 10px;
+  width: 112.3px;
+  height: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0px;
+  box-sizing: border-box;
+  gap: 8px;
+}
+.button3 {
+  position: absolute;
+  top: 120px;
+  left: 0px;
+  border-radius: 10px;
+  width: 112.3px;
+  height: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0px;
+  box-sizing: border-box;
+  gap: 8px;
+}
+.button4 {
+  position: absolute;
+  top: 120px;
+  left: 124.33px;
+  border-radius: 10px;
+  width: 112.3px;
+  height: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0px;
+  box-sizing: border-box;
+  gap: 8px;
+}
+.button5 {
+  position: absolute;
+  top: 120px;
+  left: 248.66px;
+  border-radius: 10px;
+  width: 112.3px;
+  height: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0px;
+  box-sizing: border-box;
+  gap: 8px;
+}
+.container25 {
+  align-self: stretch;
+  height: 224px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+.container26 {
+  align-self: stretch;
+  height: 184px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 12px;
+}
+.container27 {
+  align-self: stretch;
+  border-radius: 10px;
+  height: 86px;
+  display: flex;
+  align-items: center;
+  padding: 0px 12px;
+  box-sizing: border-box;
+  gap: 12px;
+}
+.containerIcon6 {
+  width: 40px;
+  border-radius: 33554400px;
+  height: 40px;
+}
+.container28 {
+  flex: 1;
+  position: relative;
+  height: 62px;
+}
+.container29 {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  width: 285px;
+  height: 20px;
+  overflow: hidden;
+  font-size: 14px;
+}
+.container30 {
+  position: absolute;
+  top: 20px;
+  left: 0px;
+  width: 285px;
+  height: 16px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  color: #6a7282;
+}
+.badge {
+  position: absolute;
+  top: 40px;
+  left: 0px;
+  border-radius: 8px;
+  background-color: #eceef2;
+  border: 1px solid rgba(0, 0, 0, 0);
+  box-sizing: border-box;
+  width: 42px;
+  height: 22px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  color: #030213;
+}
+.div19 {
+  position: relative;
+  line-height: 16px;
+}
+.container35 {
+  align-self: stretch;
+  height: 322px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+.container36 {
+  align-self: stretch;
+  height: 282px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 12px;
+}
+.container38 {
+  flex: 1;
+  height: 62px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.container39 {
+  align-self: stretch;
+  position: relative;
+  height: 20px;
+  overflow: hidden;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+.container40 {
+  align-self: stretch;
+  height: 16px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  color: #6a7282;
+}
+.container41 {
+  align-self: stretch;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #030213;
+}
+.badge2 {
+  width: 54px;
+  border-radius: 8px;
+  background-color: #eceef2;
+  border: 1px solid rgba(0, 0, 0, 0);
+  box-sizing: border-box;
+  height: 22px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+}
+.container42 {
+  width: 31.8px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #4a5565;
+}
+.icon7 {
+  width: 12px;
+  position: relative;
+  height: 12px;
+}
+.text6 {
+  flex: 1;
+  height: 16px;
+  display: flex;
+  align-items: flex-start;
+}
+.badge3 {
+  width: 66px;
+  border-radius: 8px;
+  background-color: #eceef2;
+  border: 1px solid rgba(0, 0, 0, 0);
+  box-sizing: border-box;
+  height: 22px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+}

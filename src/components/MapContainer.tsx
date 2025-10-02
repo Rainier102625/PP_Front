@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, memo } from "react";
 import { Spot } from "@/types/spot";
 import { OdsayRoute } from "@/types/odsay";
 
@@ -11,7 +11,7 @@ interface MapContainerProps {
     directionsDestination: Spot | null;
 }
 
-export function MapContainer({ searchedLocation, recommendedSpots, selectedRoute, directionsDestination }: MapContainerProps) {
+const MapContainerComponent = ({ searchedLocation, recommendedSpots, selectedRoute, directionsDestination }: MapContainerProps) => {
     const mapElement = useRef<HTMLDivElement>(null);
     const mapRef = useRef<naver.maps.Map | null>(null);
     const mainMarkerRef = useRef<naver.maps.Marker | null>(null);
@@ -48,8 +48,9 @@ export function MapContainer({ searchedLocation, recommendedSpots, selectedRoute
                 position: searchedLocation,
                 map: mapRef.current || undefined,
                 icon: {
-                    content: `<div style="background-color: red; width: 25px; height: 25px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>`,
-                    anchor: new naver.maps.Point(12.5, 12.5),
+                    url: '/ping.svg',
+                    size: new naver.maps.Size(46, 54),
+                    anchor: new naver.maps.Point(23, 54),
                 }
             });
         }
@@ -78,6 +79,11 @@ export function MapContainer({ searchedLocation, recommendedSpots, selectedRoute
                 const marker = new naver.maps.Marker({
                     position: location,
                     map: mapRef.current || undefined,
+                    icon: {
+                        url: '/ping.svg',
+                        size: new naver.maps.Size(46, 54),
+                        anchor: new naver.maps.Point(23, 54),
+                    }
                 });
                 newMarkers.push(marker);
                 bounds.extend(location);
@@ -212,11 +218,9 @@ export function MapContainer({ searchedLocation, recommendedSpots, selectedRoute
         <section className="flex-1 h-full relative">
             <div ref={mapElement} className="w-full h-full" />
 
-            <div className="absolute top-4 right-4 space-y-2 z-10">
-                <button className="w-10 h-10 bg-white rounded-md shadow-md flex items-center justify-center hover:bg-gray-100">🗺️</button>
-                <button className="w-10 h-10 bg-white rounded-md shadow-md flex items-center justify-center hover:bg-gray-100">📍</button>
-                <button className="w-10 h-10 bg-white rounded-md shadow-md flex items-center justify-center hover:bg-gray-100">⚙️</button>
-            </div>
+
         </section>
     );
-}
+};
+
+export const MapContainer = memo(MapContainerComponent);
