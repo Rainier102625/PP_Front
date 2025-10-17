@@ -83,7 +83,7 @@ export default function Home() {
             const time = format(finalDateTime, "HH:mm:ss");
             const categoryQuery = selectedCategory || "";
 
-            const apiUrl = `http://pp-domain.duckdns.org:8082/api/recommend/?lat=${lat}&lon=${lon}&time=${time}&type=${categoryQuery}&radius=8000`;
+            const apiUrl = `http://pp-domain:8081/api/recommend`;
 
             console.log("Requesting API URL:", apiUrl);
 
