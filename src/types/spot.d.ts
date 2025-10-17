@@ -1,9 +1,9 @@
 
 export interface Spot {
-    contentId: string;
-    title: string;
-    addr1: string;
-    firstImage: string;
+    contentId?: string;
+    name: string;
+    address: string;
+    firstImage: string | null;
     distanceMeters: number;
     mapX: number;
     mapY: number;

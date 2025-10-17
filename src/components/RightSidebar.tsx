@@ -56,7 +56,7 @@ export function RightSidebar({ isOpen, onClose, spots, isLoading, onGetDirection
 
             {directionsDestination && (
                 <h2 className="text-lg font-semibold text-gray-700 truncate pb-2 border-b mb-4">
-                    {originName} → {directionsDestination?.title}
+                    {originName} → {directionsDestination?.name}
                 </h2>
             )}
 
@@ -100,11 +100,11 @@ export function RightSidebar({ isOpen, onClose, spots, isLoading, onGetDirection
                                 <Card key={index} className="p-3 hover:bg-gray-50 cursor-pointer">
                                     <div className="flex items-center space-x-3">
                                         {spot.firstImage && (
-                                            <Image src={spot.firstImage} alt={spot.title} width={64} height={64} className="w-16 h-16 rounded-md object-cover bg-gray-100" />
+                                            <Image src={spot.firstImage} alt={spot.name} width={64} height={64} className="w-16 h-16 rounded-md object-cover bg-gray-100" />
                                         )}
                                         <div className="flex-grow">
-                                            <p className="font-semibold text-gray-800">{spot.title}</p>
-                                            <p className="text-xs text-gray-500">{spot.addr1}</p>
+                                            <p className="font-semibold text-gray-800">{spot.name}</p>
+                                            <p className="text-xs text-gray-500">{spot.address}</p>
                                             <div className="flex items-center text-xs text-gray-500 mt-1">
                                                 <Footprints className="w-3 h-3 mr-1"/>
                                                 <span>{(spot.distanceMeters / 1000).toFixed(1)}km</span>
