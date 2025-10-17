@@ -65,7 +65,7 @@ export function MapContainer({ searchedLocation, recommendedSpots, selectedRoute
         if (selectedRoute) return; // 경로 결과가 있을때는 추천 장소 마커를 숨김
 
         if (recommendedSpots.length > 0) {
-            const firstSpotLocation = new naver.maps.LatLng(recommendedSpots[0].mapY, recommendedSpots[0].mapX);
+            const firstSpotLocation = new naver.maps.LatLng(recommendedSpots[0].latitude, recommendedSpots[0].longitude);
             const bounds = new naver.maps.LatLngBounds(firstSpotLocation, firstSpotLocation);
 
             if (mainMarkerRef.current) {
@@ -74,7 +74,7 @@ export function MapContainer({ searchedLocation, recommendedSpots, selectedRoute
 
             const newMarkers: naver.maps.Marker[] = [];
             recommendedSpots.forEach(spot => {
-                const location = new naver.maps.LatLng(spot.mapY, spot.mapX);
+                const location = new naver.maps.LatLng(spot.latitude, spot.longitude);
                 const marker = new naver.maps.Marker({
                     position: location,
                     map: mapRef.current || undefined,
@@ -124,7 +124,7 @@ export function MapContainer({ searchedLocation, recommendedSpots, selectedRoute
 
         // --- 마커 생성 --- //
         const startLatLng = searchedLocation;
-        const destinationLatLng = new naver.maps.LatLng(Number(directionsDestination.mapY), Number(directionsDestination.mapX));
+        const destinationLatLng = new naver.maps.LatLng(Number(directionsDestination.latitude), Number(directionsDestination.longitude));
 
         newMarkers.push(new naver.maps.Marker({
             position: startLatLng,

@@ -5,7 +5,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { MapContainer } from "@/components/MapContainer";
 import { RightSidebar } from "@/components/RightSidebar";
 import { OdsayRoute } from "@/types/odsay";
-import { Spot } from "@/types/spot";
+import { Spot, SpotDetails } from "@/types/spot";
 import { format } from "date-fns";
 
 import { getDistance } from "@/lib/distance";
@@ -43,6 +43,12 @@ export default function Home() {
             }
             try {
                 const response = await fetch(`/api/search?query=${queryToGeocode}`);
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `API 요청 실패: ${response.status}`);
+                }
+
                 const data = await response.json();
                 if (data.documents && data.documents.length > 0) {
                     const firstResult = data.documents[0];
@@ -51,8 +57,12 @@ export default function Home() {
                 } else {
                     reject(`'${queryToGeocode}'에 대한 검색 결과가 없습니다.`);
                 }
-} catch (_error) {
-                reject("좌표 변환 중 오류가 발생했습니다.");
+            } catch (error) {
+                if (error instanceof Error) {
+                    reject(`좌표 변환 중 오류: ${error.message}`);
+                } else {
+                    reject("알 수 없는 오류로 좌표 변환에 실패했습니다.");
+                }
             }
         });
     };
@@ -81,7 +91,7 @@ export default function Home() {
             const lat = location.lat();
             const lon = location.lng();
             const time = format(finalDateTime, "HH:mm:ss");
-            const categoryQuery = selectedCategory || "";
+            const categoryQuery = selectedCategory || '';
 
             const apiUrl = `http://pp-domain.duckdns.org:8082/api/recommend/?lat=${lat}&lon=${lon}&time=${time}&type=${categoryQuery}&radius=8000`;
 
@@ -91,21 +101,54 @@ export default function Home() {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            const data: Spot[] = await response.json();
-            console.log("서버로부터 받은 실제 데이터:", data);
+            const apiResponse = await response.json();
+            console.log("서버로부터 받은 실제 데이터:", apiResponse);
 
-            if (data.length === 0) {
+            const results = apiResponse[0]?.results;
+            if (!results) {
+                alert("추천 장소를 가져오지 못했습니다.");
+                setRecommendedSpots([]);
+                return;
+            }
+
+            const categoryIdToKeyMap: { [key: string]: string } = {
+                '12': 'tourist_attraction',
+                '14': 'cultural_facilities',
+                '15': 'festivals_performances_events',
+                '25': 'travel_course',
+                '28': 'leisure_sports',
+                '32': 'accommodation',
+                '38': 'shopping',
+                '39': 'food',
+            };
+
+            let allSpots: any[] = [];
+            if (categoryQuery && categoryIdToKeyMap[categoryQuery]) {
+                const categoryKey = categoryIdToKeyMap[categoryQuery];
+                allSpots = results[categoryKey] || [];
+            } else {
+                // 카테고리 선택이 없으면 모든 결과를 합침
+                allSpots = Object.values(results).flat();
+            }
+
+            if (allSpots.length === 0) {
                 alert("해당 조건에 맞는 추천 장소가 없습니다.");
             }
 
-            // 3. 프론트에서 거리 재계산 및 정렬
-            const spotsWithRecalculatedDistance = data.map(spot => ({
-                ...spot,
-                distanceMeters: getDistance(lat, lon, spot.mapY, spot.mapX)
+            // 3. 프론트에서 거리 재계산 및 정렬, 데이터 형식 맞추기
+            const spotsWithRecalculatedDistance = allSpots.map(item => ({
+                id: item.id,
+                name: item.name,
+                address: item.address,
+                longitude: Number(item.longitude),
+                latitude: Number(item.latitude),
+                category: item.category, // API가 카테고리 필드를 반환한다고 가정
+                distanceMeters: getDistance(lat, lon, Number(item.latitude), Number(item.longitude)),
+                details: item, // 원본 데이터 저장
             }));
 
             spotsWithRecalculatedDistance.sort((a, b) => a.distanceMeters - b.distanceMeters);
-            setRecommendedSpots(spotsWithRecalculatedDistance);
+            setRecommendedSpots(spotsWithRecalculatedDistance as Spot[]);
 
         } catch (error) {
             console.error("검색 처리 중 오류 발생:", error);
@@ -130,8 +173,8 @@ export default function Home() {
         const distance = getDistance(
             searchedLocation.lat(),
             searchedLocation.lng(),
-            spot.mapY,
-            spot.mapX
+            spot.latitude,
+            spot.longitude
         );
 
         // 700m 이내인 경우, 프론트에서 직접 도보 경로 생성
@@ -154,8 +197,8 @@ export default function Home() {
                             sectionTime: walkingTime,
                             startX: searchedLocation.lng(),
                             startY: searchedLocation.lat(),
-                            endX: spot.mapX,
-                            endY: spot.mapY,
+                            endX: spot.longitude,
+                            endY: spot.latitude,
                         },
                     ],
                 },
@@ -169,7 +212,7 @@ export default function Home() {
 
         // 700m 이상인 경우, 기존 API 호출 로직 실행
         try {
-            const url = `/api/odsay-directions?sx=${searchedLocation.lng().toFixed(6)}&sy=${searchedLocation.lat().toFixed(6)}&ex=${spot.mapX.toFixed(6)}&ey=${spot.mapY.toFixed(6)}`;
+            const url = `/api/odsay-directions?sx=${searchedLocation.lng().toFixed(6)}&sy=${searchedLocation.lat().toFixed(6)}&ex=${spot.longitude.toFixed(6)}&ey=${spot.latitude.toFixed(6)}`;
             const response = await fetch(url);
             if (!response.ok) {
                 const errorData = await response.json();

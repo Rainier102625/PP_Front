@@ -131,7 +131,7 @@ export function Sidebar({
                         setIsGettingLocation(false);
                     });
                 },
-                (_error) => {
+                () => {
                     alert("위치 정보를 가져오는 데 실패했습니다.");
                     setIsGettingLocation(false);
                 }

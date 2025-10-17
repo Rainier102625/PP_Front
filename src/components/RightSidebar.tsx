@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { X, Bus, TrainFront, PersonStanding, Footprints } from "lucide-react";
 import { OdsayRoute, SubPath } from "@/types/odsay";
 import { Spot } from "@/types/spot";
-import Image from "next/image";
+
 
 interface RightSidebarProps {
     isOpen: boolean;
@@ -99,9 +99,6 @@ export function RightSidebar({ isOpen, onClose, spots, isLoading, onGetDirection
                             {spots.map((spot, index) => (
                                 <Card key={index} className="p-3 hover:bg-gray-50 cursor-pointer">
                                     <div className="flex items-center space-x-3">
-                                        {spot.firstImage && (
-                                            <Image src={spot.firstImage} alt={spot.name} width={64} height={64} className="w-16 h-16 rounded-md object-cover bg-gray-100" />
-                                        )}
                                         <div className="flex-grow">
                                             <p className="font-semibold text-gray-800">{spot.name}</p>
                                             <p className="text-xs text-gray-500">{spot.address}</p>
