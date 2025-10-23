@@ -28,3 +28,21 @@ export default function RootLayout({
         </html>
     );
 }
+//
+// import React from "react";
+// import { Routes, Route } from "react-router-dom";
+// import Home from "./pages/Home";          // 네가 만든 홈 파일명에 맞게 수정 (HomePage.tsx면 ./pages/HomePage)
+// import SearchPage from "./pages/SearchPage";
+// import RoutePage from "./pages/RoutePage";
+//
+// function App() {
+//     return (
+//         <Routes>
+//             <Route path="/" element={<Home />} />
+//             <Route path="/search" element={<SearchPage />} />
+//             <Route path="/route" element={<RoutePage />} />
+//         </Routes>
+//     );
+// }
+//
+// export default App;

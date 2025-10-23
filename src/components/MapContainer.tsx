@@ -42,7 +42,7 @@ export function MapContainer({ searchedLocation, recommendedSpots, selectedRoute
             }
 
             mapRef.current.setCenter(searchedLocation);
-            mapRef.current.setZoom(12);
+            mapRef.current.setZoom(15);
 
             mainMarkerRef.current = new naver.maps.Marker({
                 position: searchedLocation,
@@ -213,9 +213,6 @@ export function MapContainer({ searchedLocation, recommendedSpots, selectedRoute
             <div ref={mapElement} className="w-full h-full" />
 
             <div className="absolute top-4 right-4 space-y-2 z-10">
-                <button className="w-10 h-10 bg-white rounded-md shadow-md flex items-center justify-center hover:bg-gray-100">🗺️</button>
-                <button className="w-10 h-10 bg-white rounded-md shadow-md flex items-center justify-center hover:bg-gray-100">📍</button>
-                <button className="w-10 h-10 bg-white rounded-md shadow-md flex items-center justify-center hover:bg-gray-100">⚙️</button>
             </div>
         </section>
     );

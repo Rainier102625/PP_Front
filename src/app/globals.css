@@ -124,3 +124,66 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* --- [삭제] ---
+  .App, .App-logo, .App-header, .App-link, @keyframes,
+  충돌하는 body {}, code {} 스타일을 모두 삭제했습니다.
+*/
+
+
+/* --- [추가] ---
+  '디자인 프로젝트'의 'home.tsx'에서 가져온 필수 스타일
+*/
+.home-wrap {
+  position: relative;
+  min-height: 100vh;
+  background: #0e1117;
+}
+
+.map-hero {
+  /* 모바일(기본)에서는 화면 전체 높이 */
+  height: 100dvh;
+}
+
+/* 768px 이상 PC 화면에서만 적용 */
+@media (min-width: 768px) {
+  .map-hero {
+    height: 100vh;
+  }
+}
+
+.ui-scale {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+.ai-badge .icon {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  background: rgba(255,255,255,.15);
+  border-radius: 8px;
+}
+
+/* --- [추가] ---
+  'MenuDrawer.tsx'에서 가져온 전역 스타일
+*/
+@media (max-width: 768px) {
+  body.menu-open .ai-badge {
+    display: none !important;
+  }
+}
