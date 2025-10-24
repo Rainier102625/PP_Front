@@ -15,11 +15,20 @@ const DUMMY_CONGESTION: Record<string, number> = {
 };
 
 /** 값→색상 */
-function colorFor(value: number) {
-    if (value >= 66) return "#ff5a5a";  // 붐빔(빨강)
-    if (value >= 33) return "#4e89ff";  // 보통(파랑)
-    return "#35b26f";                   // 여유(초록)
+function colorFor(v: number) {
+    if (v >= 66) return "#ff5a5a"; // 붐빔(빨강)
+    if (v >= 33) return "#4e89ff"; // 보통(파랑)
+    return "#35b26f";              // 여유(초록)
 }
+
+/** 기본(비활성) 스타일: 회색 */
+const BASE_STYLE: L.PathOptions = {
+    color: "#ffffff",        // 경계선
+    weight: 1.2,
+    opacity: 1,
+    fillColor: "#cbd5e1",    // 회색
+    fillOpacity: 0.35,
+};
 
 export default function SeoulCongestionMap() {
     const mapRef = useRef<any>(null);
@@ -31,7 +40,6 @@ export default function SeoulCongestionMap() {
         let map: any;
 
         (async () => {
-            // 서버가 아닌 브라우저에서만 로드
             const leaflet = await import("leaflet");
             L = leaflet;
 
@@ -44,41 +52,43 @@ export default function SeoulCongestionMap() {
             });
             mapRef.current = map;
 
+            // 타일
             L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
                 attribution:
                     '&copy; <a href="https://osm.org/copyright">OpenStreetMap</a>',
                 maxZoom: 19,
             }).addTo(map);
 
+            // GeoJSON
             const res = await fetch("/data/seoul-gu.json");
             const geojson = await res.json();
 
-            const styleFn = (feature: any) => {
-                const gu: string = feature?.properties?.nm ?? "UNKNOWN";
-                const v = DUMMY_CONGESTION[gu] ?? 0;
-                return {
-                    color: "#ffffff",
-                    weight: 1.2,
-                    opacity: 1,
-                    fillOpacity: 0.55,
-                    fillColor: colorFor(v),
-                };
-            };
+            // 기본 스타일(회색)만 적용
+            const styleFn = () => ({ ...BASE_STYLE });
 
             const onEachFeature = (feature: any, layer: any) => {
                 const gu: string = feature?.properties?.nm ?? "UNKNOWN";
                 const v = DUMMY_CONGESTION[gu] ?? 0;
 
-                // 툴팁
+                // 기본 툴팁
                 layer.bindTooltip(
                     `<div style="font-weight:600">${gu}</div><div>혼잡도: ${v}</div>`,
                     { sticky: true, direction: "top", offset: L.point(0, -4) }
                 );
 
-                // hover 스타일
+                // hover 시에만 혼잡도 색/강조 적용
                 layer.on({
-                    mouseover: () => layer.setStyle({ weight: 2, fillOpacity: 0.75 }),
-                    mouseout: () => layer.setStyle({ weight: 1.2, fillOpacity: 0.55 }),
+                    mouseover: () => {
+                        layer.setStyle({
+                            color: "#ffffff",
+                            weight: 2,
+                            fillOpacity: 0.70,
+                            fillColor: colorFor(v),
+                        });
+                    },
+                    mouseout: () => {
+                        layer.setStyle({ ...BASE_STYLE });
+                    },
                     click: () => {
                         const b = layer.getBounds?.();
                         if (b) map.fitBounds(b, { maxZoom: 13 });
@@ -88,24 +98,35 @@ export default function SeoulCongestionMap() {
                 // 중앙 라벨
                 try {
                     const c =
-                        layer.getBounds?.().getCenter?.() ?? layer.getCenter?.();
+                        (layer as any).getBounds?.().getCenter?.() ??
+                        (layer as any).getCenter?.();
+
                     if (c) {
                         const divIcon = L.divIcon({
                             className: "gu-label",
                             html: `
                 <div style="
-                  background: rgba(255,255,255,0.85);
-                  padding:2px 6px;border-radius:6px;
-                  font-size:12px;color:#1f2937;font-weight:600;
-                  box-shadow:0 1px 2px rgba(0,0,0,0.08);white-space:nowrap;
+                  font-size: 13px;
+                  color: #1f2937;
+                  font-weight: 700;
+                  text-shadow: 0 0 3px rgba(255,255,255,0.9);
+                  white-space: nowrap;
                 ">${gu}</div>`,
                         });
-                        L.marker(c, { icon: divIcon, interactive: false }).addTo(map);
+
+                        L.marker(c as any, {
+                            icon: divIcon as any,
+                            interactive: false,
+                            zIndexOffset: 1000,
+                        }).addTo(map);
                     }
                 } catch {}
             };
 
-            const layer = L.geoJSON(geojson, { style: styleFn, onEachFeature }).addTo(map);
+            const layer = L.geoJSON(geojson, {
+                style: styleFn as any,
+                onEachFeature,
+            }).addTo(map);
 
             try {
                 map.fitBounds(layer.getBounds(), { padding: [10, 10] });
