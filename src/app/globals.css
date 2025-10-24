@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "leaflet/dist/leaflet.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -178,6 +179,18 @@ body {
   background: rgba(255,255,255,.15);
   border-radius: 8px;
 }
+
+.gu-label { pointer-events: none; user-select: none; }
+.leaflet-tooltip.gu-tooltip {
+    background: rgba(255,255,255,0.95);
+    color:#111827;
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.12);
+    font-weight: 600;
+}
+
+
 
 /* --- [추가] ---
   'MenuDrawer.tsx'에서 가져온 전역 스타일
