@@ -8,11 +8,12 @@ type Props = {
 const CurrentLocationButton = ({ onClick }: Props) => {
     return (
         <button
+            type="button"
             onClick={onClick}
             title="현재 위치로"
             className="
-                absolute z-[1200]
-                right-3 bottom-19
+                absolute z-[1400]
+                right-3 bottom-[76px]
 
                 w-12 h-12 /* 👈 48x48px 고정 크기 */
                 rounded-full
@@ -30,7 +31,7 @@ const CurrentLocationButton = ({ onClick }: Props) => {
         >
             {/* 십자선 아이콘 (SVG) */}
             <svg
-                width="24" height="24" /* 👈 아이콘 크기 키움 */
+                width="24" height="24"
                 viewBox="0 0 24 24"
                 fill="none" stroke="currentColor" strokeWidth="2.5"
                 strokeLinecap="round" strokeLinejoin="round"
@@ -42,8 +43,6 @@ const CurrentLocationButton = ({ onClick }: Props) => {
                 <line x1="21" y1="12" x2="17" y2="12"></line>
                 <line x1="7" y1="12" x2="3" y2="12"></line>
             </svg>
-
-            {/* 👈 텍스트 완전 삭제 */}
         </button>
     );
 };

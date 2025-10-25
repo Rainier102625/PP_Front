@@ -187,3 +187,23 @@ body {
     display: none !important;
   }
 }
+
+/*
+  수평 스크롤바를 얇게 표시
+*/
+[role="tablist"].overflow-x-auto::-webkit-scrollbar {
+  height: 6px;
+}
+[role="tablist"].overflow-x-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+[role="tablist"].overflow-x-auto::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,.15);
+  border-radius: 9999px;
+}
+
+/* Firefox */
+[role="tablist"].overflow-x-auto {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,0,0,.15) transparent;
+}

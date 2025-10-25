@@ -20,8 +20,7 @@ const MenuDrawer = ({ open, onClose }: Props) => {
         };
     }, [open]);
 
-    // [제거] <style> 태그를 주입하던 useEffect는 "완전히 삭제"합니다.
-    // 모든 스타일은 Tailwind 클래스로 대체됩니다.
+
 
     return (
         // Headless UI의 Transition과 Dialog를 사용해 애니메이션과 접근성 처리
@@ -102,13 +101,6 @@ const MenuDrawer = ({ open, onClose }: Props) => {
                                                 md:text-base md:px-4 md:py-3
                                             ">
                                                 로그인
-                                            </button>
-                                            <button className="
-                                                // 모바일 (기본): text-sm px-3 py-2.5
-                                                text-sm px-3 py-2.5 rounded-2xl border border-gray-200 bg-blue-50 font-bold
-                                                // PC (md): text-base md:px-4 md:py-3
-                                            ">
-                                                AI 어시스턴트
                                             </button>
                                         </div>
                                     </div>
