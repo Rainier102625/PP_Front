@@ -46,10 +46,10 @@ export default function AsideBar({ onMenuOpen }: AsideBarProps) {
 
                     {/* 6. '그림' 버튼: /art 경로로 이동 (예시) */}
                     <Link
-                        href="/art"
+                        href="/CongestionMap"
                         aria-label="그림"
                         className={`w-10 h-10 grid place-items-center rounded-xl shadow ${
-                            pathname === '/art' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border'
+                            pathname === '/CongestionMap' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border'
                         }`}
                     >
                         {/* (그림 아이콘) */}

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "leaflet/dist/leaflet.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -186,6 +187,16 @@ body {
   body.menu-open .ai-badge {
     display: none !important;
   }
+}
+
+.gu-label { pointer-events: none; user-select: none; }
+.leaflet-tooltip.gu-tooltip {
+  background: rgba(255,255,255,0.95);
+  color:#111827;
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.12);
+  font-weight: 600;
 }
 
 /*
