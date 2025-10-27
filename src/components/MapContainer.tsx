@@ -1,8 +1,11 @@
 // src/components/MapContainer.tsx
+
 "use client";
 
+
+
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Map, MapMarker, useKakaoLoader, MapInfoWindow } from "react-kakao-maps-sdk";
+import { Map, MapMarker, useKakaoLoader, Polyline } from "react-kakao-maps-sdk";
 import TopSearchBar from "@/components/TopSearchBar";
 import Categories from "@/components/Categories";
 import AiAssistantPanel from "@/components/AiAssistantPanel";
@@ -11,634 +14,2009 @@ import CurrentLocationButton from "@/components/CurrentLocationButton";
 import AutoComplete, { AutoCompleteItem } from "@/components/AutoComplete";
 import ResultPanel from "@/components/ResultPanel"; // (RecommendPanel -> ResultPanel)
 import { ChatMessage } from "@/types/chatMessage";
-
+import InfoWindow = kakao.maps.InfoWindow;
+import RoutePanel from "@/components/RoutePanel";
+import * as turf from '@turf/turf';
+import {Polygon, MultiPolygon, Feature} from 'geojson';
+import {featureCollection } from "@turf/helpers";
+import { union } from "@turf/turf";
 // --- 타입 정의 섹션 ---
 
+// 서울시 경계 폴리곤 타입
+type SeoulPoly = Feature<Polygon | MultiPolygon>;
+
+// 위도/경도 타입
 type LatLng = { lat: number; lng: number };
-/** 카카오 API 원본 타입 */
+
+// 카카오 API 장소 검색 결과 타입
 type Place = kakao.maps.services.PlacesSearchResultItem;
-/** 우리 API 원본 타입 */
+
+// Spring API 장소 추천 응답 타입
 type Rec = {
     id: string;
     name: string;
+
     address: string;
+
     category: string;
+
     longitude: string;
+
     latitude: string;
+
     congestionLevel?: string;
+
     distance?: number;
+
     other_info?: string;
+
 };
 
-/** [핵심] 카카오 + 우리 API를 통합하는 앱 전용 타입 */
+
+
+// 통합 장소 타입
+
 export type AppPlace = {
+
     id: string;
+
     name: string;
+
     address: string;
+
     lat: number;
+
     lng: number;
+
     category?: string;
+
     congestionLevel?: string; // (우리 API에만 있음)
-    phone?: string;           // (카카오 API에만 있음)
-    placeUrl?: string;        // (카카오 API에만 있음)
+
+    phone?: string; // (카카오 API에만 있음)
+
+    placeUrl?: string; // (카카오 API에만 있음)
+
     distance?: number;
+
 };
 
-/**
- * [어댑터 1] 우리 API 응답(Rec)을 AppPlace로 변환
- */
+
+
+// 경로 구간 타입
+
+type RouteSegment = {
+
+    path: LatLng[];
+
+    color: string;
+
+};
+
+
+
+/** 경로 경유지(턴) 타입 */
+
+type RouteTurn = {
+
+    lat: number;
+
+    lng: number;
+
+// (API가 텍스트 설명을 제공하지 않으므로, 좌표만 저장)
+
+};
+
+
+
+/** 경로 요약 정보 타입 */
+
+type RouteSummary = {
+
+    duration: number; // 초
+
+    distance: number; // 미터
+
+    score: number;
+
+    instructions: string[];
+
+};
+
+
+
+/** 통합 경로 정보 타입 */
+
+export type RouteInfo = {
+
+    summary: RouteSummary;
+
+    segments: RouteSegment[]; // 지도에 그릴 폴리라인 조각들
+
+    turns: RouteTurn[]; // 패널에 표시할 경유지(턴) 목록
+
+};
+
+
+
+export type WalkRouteSummary = {
+
+    duration: number; // 초
+
+    distance: number; // 미터
+
+    score: number;
+
+    instructions: string[];
+
+};
+
+
+
+/** [추가] 대중교통 경로 세그먼트 타입 */
+
+export type TransitSegment = {
+
+    mode: "WALK" | "BUS" | "SUBWAY"; // (SUBWAY는 응답에 따라 추가/수정)
+
+    routeNumber: string;
+
+    startName: string;
+
+    endName: string;
+
+    duration: number;
+
+    distance: number;
+
+    congestion?: string;
+
+    steps: string[];
+
+};
+
+
+
+/** [추가] 대중교통 전체 경로 타입 */
+
+export type TransitRoute = {
+
+    totalTime: number;
+
+    totalDistance: number;
+
+    walkingDistance: number;
+
+    fare: number;
+
+    segments: TransitSegment[];
+
+// [가정] API 응답에 이 정보가 포함되어 있다고 가정합니다. (도보와 동일)
+
+    congestionPoints?: { latitude: number; longitude: number; congestionLevel: string }[];
+
+};
+
+
+
+// 변환 rec -> AppPlace
+
 const recToAppPlace = (rec: Rec): AppPlace => ({
+
     id: rec.id.toString(),
+
     name: rec.name,
+
     address: rec.address,
+
     lat: Number(rec.latitude),
+
     lng: Number(rec.longitude),
+
     category: rec.category,
+
     congestionLevel: rec.congestionLevel,
+
 });
 
-/**
- * [어댑터 2] 카카오 API 응답(Place)을 AppPlace로 변환
- */
+
+
+// 변환 kakao Place -> AppPlace
+
 const kakaoPlaceToAppPlace = (place: Place): AppPlace => ({
+
     id: place.id,
+
     name: place.place_name,
+
     address: place.road_address_name || place.address_name,
+
     lat: Number(place.y),
+
     lng: Number(place.x),
+
     category: place.category_name,
+
     phone: place.phone,
+
     placeUrl: place.place_url,
+
 });
+
+
 
 // --- 상수 정의 섹션 ---
 
+
+
 const INITIAL_CENTER: LatLng = { lat: 37.566826, lng: 126.9786567 };
 
+
+
 const CAT_ITEMS = [
+
     { code: "12", name: "관광지", icon: "📍" },
+
     { code: "14", name: "문화시설", icon: "🏛️" },
+
     { code: "15", name: "행사/공연/축제", icon: "🎆" },
+
     { code: "25", name: "여행코스", icon: "🗺️" },
+
     { code: "28", name: "레포츠", icon: "🏌️" },
+
     { code: "32", name: "숙박", icon: "🏨" },
+
     { code: "38", name: "쇼핑", icon: "🛍️" },
+
     { code: "39", name: "음식점", icon: "🍽️" },
+
 ];
 
+
+
 const myImage = {
+
     src: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+
         `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 32 32">
-      <circle cx="16" cy="16" r="10" fill="white"/>
-      <circle cx="16" cy="16" r="10" fill="none" stroke="rgba(0,0,0,.15)" stroke-width="1"/>
-      <circle cx="16" cy="16" r="5.5" fill="#ef4444"/>
-    </svg>`
+
+<circle cx="16" cy="16" r="10" fill="white"/>
+
+<circle cx="16" cy="16" r="10" fill="none" stroke="rgba(0,0,0,.15)" stroke-width="1"/>
+
+<circle cx="16" cy="16" r="5.5" fill="#ef4444"/>
+
+</svg>`
+
     )}`,
+
     size: { width: 40, height: 40 },
+
     options: { offset: { x: 20, y: 20 } },
+
 } as const;
 
+
+
+// 혼잡도에 따른 색상 반환 함수
+
+function colorFor(v: string) {
+
+    if (v === '붐빔') return "#ff5a5a"; // 붐빔(빨강)
+
+    if (v === '약간붐빔' || v === '약간 붐빔') return "#febd1a"; // 약간 붐빔(노랑)
+
+    if (v === '보통') return "#4e89ff";// 보통(파랑)
+
+    return "#35b26f"; // 여유(초록)
+
+}
+
+
+
 export default function MapContainer() {
+
     const [loading] = useKakaoLoader({
+
         appkey: process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY!,
+
         libraries: ["services"],
+
     });
 
-    // --- State 정의 섹션 ---
 
-    // 지도/검색
+
+// --- State 정의 섹션 ---
+
+
+
+// 지도/검색
+
     const [center, setCenter] = useState<LatLng>(INITIAL_CENTER);
+
     const [myLocation, setMyLocation] = useState<LatLng | null>(null);
+
     const [query, setQuery] = useState("");
+
     const [isSearchFocused, setIsSearchFocused] = useState(false);
+
     const [suggestions, setSuggestions] = useState<AutoCompleteItem[]>([]);
 
-    // [수정] 모든 검색 결과(카카오, 우리API)는 AppPlace[] 타입으로 통합
+
+
+// [수정] 모든 검색 결과(카카오, 우리API)는 AppPlace[] 타입으로 통합
+
     const [results, setResults] = useState<AppPlace[]>([]);
-    // [수정] 상세보기 상태도 AppPlace 타입으로 통합
+
+// [수정] 상세보기 상태도 AppPlace 타입으로 통합
+
     const [selectedPlace, setSelectedPlace] = useState<AppPlace | null>(null);
-    // [수정] 검색 패널 상태
+
+// [수정] 검색 패널 상태
+
     const [resultsPanelOpen, setResultsPanelOpen] = useState(false);
 
-    // 추천 API용 카테고리
+
+
+// 추천 API용 카테고리
+
     const [selectedCat, setSelectedCat] = useState<string | null>(null);
 
-    // 기타
+
+
+// 기타
+
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
     const [isSearchLoading, setIsSearchLoading] = useState(false); // [추가] 검색용 로딩 state
 
-    // kakao refs
+
+
+// 서울시 경계 폴리곤
+
+    const [seoulPolygon, setSeoulPolygon] = useState<SeoulPoly | null>(null);
+
+// 출발지
+
+    const [origin, setOrigin] = useState<AppPlace | null>(null);
+
+// 목적지
+
+    const [destination, setDestination] = useState<AppPlace | null>(null);
+
+// 길찾기 경로 활성화
+
+    const [activeRoute, setActiveRoute] = useState<RouteInfo | null>(null);
+
+// 길찾기 패널 활성화
+
+    const [routePanelOpen, setRoutePanelOpen] = useState(false);
+
+
+
+// 길찾기 경로 폴리라인 세그먼트 state
+
+    const [routeSegments, setRouteSegments] = useState<RouteSegment[] | null>(null);
+
+// 길찾기 요약 정보 state
+
+    const [routeSummary, setRouteSummary] = useState<RouteSummary | null>(null);
+
+
+
+    /** 경로 정렬 옵션 state (기본값: 'duration') */
+
+    const [sortOption, setSortOption] = useState<'duration' | 'congestion'>('duration');
+
+
+
+    /** [추가] 이동 모드 (도보/대중교통) */
+
+    const [travelMode, setTravelMode] = useState<'walk' | 'transit'>('walk');
+
+
+
+    /** [수정] 도보 경로 데이터 (패널용) */
+
+    const [walkSummary, setWalkSummary] = useState<WalkRouteSummary | null>(null);
+
+    /** [추가] 대중교통 경로 데이터 (패널용) */
+
+    const [transitRoutes, setTransitRoutes] = useState<TransitRoute[] | null>(null);
+
+// ---
+
+
+
+// kakao refs
+
     const mapRef = useRef<kakao.maps.Map | null>(null);
+
     const placesRef = useRef<kakao.maps.services.Places | null>(null);
+
     const geocoderRef = useRef<kakao.maps.services.Geocoder | null>(null); // [수정] Geocoder 추가
+
     const infoWindowRef = useRef<kakao.maps.InfoWindow | null>(null);
 
-    // Ai 대화창 상태
+
+
+// Ai 대화창 상태
+
     const [aiChatOpen, setAiChatOpen] = useState(false);
+
     const [aiQuery, setAiQuery] = useState("");
+
     const [messages, setMessages] = useState<ChatMessage[]>([
-        { id: 'init-1', text: '안녕하세요! 반갑습니다. 무엇을 도와드릴까요? 궁금한 점이 있으시거나 도움이 필요하시면 언제든지 말씀해주세요! 😊', sender: 'ai' },
+
+        { id: 'init-1', sender: 'ai' ,text: '안녕하세요! 반갑습니다. 무엇을 도와드릴까요? 궁금한 점이 있으시거나 도움이 필요하시면 언제든지 말씀해주세요! 😊' },
+
         { id: 'init-2', sender: 'ai', text: '추천 질문을 눌러 시작해보세요!' },
+
         { id: 'init-3', sender: 'ai', recommendation: '강남역 주변에 카페 찾아줘' }
+
     ]);
+
     const [isLoading, setIsLoading] = useState(false); // (AI용 로딩)
 
-    // --- kakao SDK 준비 ---
+
+
+// --- kakao SDK 준비 ---
+
     useEffect(() => {
+
         if (loading) return;
+
         const k = (window as any).kakao;
+
         if (k?.maps?.services) {
+
             if (!placesRef.current) {
+
                 placesRef.current = new k.maps.services.Places();
+
             }
+
             if (!geocoderRef.current) {
+
                 geocoderRef.current = new k.maps.services.Geocoder();
+
             }
+
         }
+
         handleGetCurrentLocation();
+
     }, [loading]);
 
-    // --- 자동완성 (Kakao API) ---
+
+
+// --- 자동완성 (Kakao API) ---
+
     useEffect(() => {
-        if (!isSearchFocused || !query.trim() || !placesRef.current) {
-            setSuggestions([]);
-            return;
-        }
+
         const k = (window as any).kakao;
+
+        if (!isSearchFocused || !query.trim() || !placesRef.current) {
+
+            setSuggestions([]);
+
+            return;
+
+        }
+
+
+
+        const seoulBounds = new k.maps.LatLngBounds(
+
+            new k.maps.LatLng(37.413294, 126.734086), // 남서쪽 좌표
+
+            new k.maps.LatLng(37.715133, 127.269311) // 북동쪽 좌표
+
+        );
+
+
+
         const t = setTimeout(() => {
+
             placesRef.current!.keywordSearch(
+
                 query,
+
                 (data, status) => {
+
                     if (status === k.maps.services.Status.OK) {
+
                         setSuggestions(
+
                             data.slice(0, 10).map((d) => ({
+
                                 id: d.id,
+
                                 place_name: d.place_name,
+
                                 road_address_name: d.road_address_name || d.address_name || "",
+
                                 x: d.x,
+
                                 y: d.y,
+
                             }))
+
                         );
+
                     } else setSuggestions([]);
+
                 },
-                { sort: k.maps.services.SortBy.ACCURACY }
+
+                { sort: k.maps.services.SortBy.ACCURACY,
+
+                    bounds: seoulBounds } // 서울시 경계 내로 검색 제한
+
             );
+
         }, 200);
-        return () => clearTimeout(t);
+
+        return () => {
+
+            clearTimeout(t);
+
+            infoWindowRef.current = null;
+
+        };
+
     }, [query, isSearchFocused]);
 
-    // --- 👇 [추가] MapInfoWindow의 'close' 이벤트를 감지하는 훅 ---
+
+
+//상세 정보 닫기 버튼 감지
+
     useEffect(() => {
-        // 1. selectedPlace가 있고(인포윈도우가 열렸고),
-        //    ref에 카카오 InfoWindow 객체가 잡혔을 때
-        if (selectedPlace && infoWindowRef.current) {
 
-            const k = (window as any).kakao;
-            const iw = infoWindowRef.current;
+        const k = (window as any).kakao;
 
-            // 2. 'close' 이벤트(네이티브 X버튼)가 발생하면 실행할 함수
-            const handleClose = () => {
-                setSelectedPlace(null); // 👈 React state를 업데이트
+        if (!k?.maps || !mapRef.current) return; // 카카오맵이나 지도 객체가 없으면 종료
+
+
+
+        const map = mapRef.current; // 지도 객체 가져오기
+
+
+
+// --- InfoWindow 생성 (한 번만) ---
+
+        if (!infoWindowRef.current) {
+
+            infoWindowRef.current = new k.maps.InfoWindow({
+
+                removable: 'true',// 기본 'X' 버튼 사용
+
+                content: '', // 초기 내용
+
+            });
+
+        }
+
+        const iw : InfoWindow | null = infoWindowRef.current; // 인포윈도우 객체 가져오기
+
+
+
+// --- 'close' 이벤트 핸들러 정의 ---
+
+        const handleClose = () => {
+
+            setSelectedPlace(null); // 'X' 버튼 누르면 state null로
+
+            setRouteSegments(null)
+
+        };
+
+
+
+// --- selectedPlace 상태에 따라 열기/닫기/업데이트 ---
+
+        if (selectedPlace && iw) {
+
+// 1. 내용(Content) 설정
+
+// (주의: HTML 문자열로 만들어야 함)
+
+            const contentDiv = document.createElement('div');
+
+            contentDiv.style.padding = '8px 30px 30px 10px';
+
+            contentDiv.style.width = 'auto';
+
+            contentDiv.style.maxWidth = '400px'
+
+            contentDiv.style.minWidth = '200px';
+
+            contentDiv.style.lineHeight = '1.4';
+
+            contentDiv.innerHTML = `
+
+<div style="font-weight: bold; margin-bottom: 5px; font-size: 15px; overflow-wrap: break-word; word-break: keep-all;">${selectedPlace.name}</div>
+
+<div style="font-size: 10px; color: #333; overflow-wrap: break-word; word-break: keep-all;">${selectedPlace.address}</div>
+
+<div style="font-size: 11px; color: #888; margin-top: 4px;">${selectedPlace.category || ''}</div>
+
+
+
+${selectedPlace.phone ? `<div style="font-size: 13px; color: green; margin-top: 4px;">${selectedPlace.phone}</div>` : ''}
+
+${selectedPlace.placeUrl ? `<a href="${selectedPlace.placeUrl}" target="_blank" rel="noreferrer" style="color: blue; text-decoration: none; font-size: 12px; margin-top: 6px; display: inline-block;">카카오맵에서 상세보기</a>` : ''}
+
+${selectedPlace.congestionLevel ? `<div style="font-size: 13px; color: #059669; margin-top: 4px; font-weight: bold;">혼잡도: ${selectedPlace.congestionLevel}</div>` : ''}
+
+`;
+
+
+
+            const buttonContainer = document.createElement('div');
+
+            buttonContainer.style.marginTop = '10px';
+
+            buttonContainer.style.display = 'flex';
+
+            buttonContainer.style.gap = '8px';
+
+
+
+            const startButton = document.createElement('button');
+
+            startButton.textContent = '여기서 출발';
+
+            startButton.style.padding = '4px 8px';
+
+            startButton.style.backgroundColor = '#007bff';
+
+            startButton.style.color = 'white';
+
+            startButton.style.border = 'none';
+
+            startButton.style.borderRadius = '4px';
+
+            startButton.style.cursor = 'pointer';
+
+            startButton.onclick = () => {
+
+                setOrigin(selectedPlace);
+
+                alert(`${selectedPlace.name}을(를) 출발지로 설정했습니다.`);
+
+                iw.close();
+
             };
 
-            // 3. 카카오맵 이벤트 리스너 등록
+
+
+            const endButton = document.createElement('button');
+
+            endButton.textContent = '여기로 도착';
+
+            endButton.style.padding = '4px 8px';
+
+            endButton.style.backgroundColor = '#28a745';
+
+            endButton.style.color = 'white';
+
+            endButton.style.border = 'none';
+
+            endButton.style.borderRadius = '4px';
+
+            endButton.style.cursor = 'pointer';
+
+            endButton.onclick = () => {
+
+                setDestination(selectedPlace);
+
+                alert(`${selectedPlace.name}을(를) 도착지로 설정했습니다.`);
+
+                iw.close();
+
+            };
+
+
+
+            buttonContainer.appendChild(startButton);
+
+            buttonContainer.appendChild(endButton);
+
+            contentDiv.appendChild(buttonContainer);
+
+
+
+// iw.setContent('<div>테스트</div>');
+
+            iw.setContent(contentDiv);
+
+
+
+// 2. 위치(Position) 설정
+
+            iw.setPosition(new k.maps.LatLng(selectedPlace.lat, selectedPlace.lng));
+
+
+
+            iw.setZIndex(1); // 다른 마커들 위에 표시
+
+
+
+// 3. 인포윈도우 열기
+
+            iw.open(map); // 두 번째 인자는 앵커 마커인데, 여기선 불필요
+
+
+
+// 4. 'close' 이벤트 리스너 등록
+
             k.maps.event.addListener(iw, 'close', handleClose);
 
-            // 4. 클린업: selectedPlace가 바뀌거나(e.g., null이 됨)
-            //    컴포넌트가 unmount될 때 리스너를 꼭 제거합니다.
-            return () => {
-                k.maps.event.removeListener(iw, 'close', handleClose);
-            };
+
+
+        } else {
+
+// selectedPlace가 null이면 인포윈도우 닫기
+
+            if(iw){
+
+                iw.close();
+
+            }
+
         }
-    }, [selectedPlace]); // 👈 selectedPlace가 바뀔 때마다 이 로직을 실행
-    // --- 👆 [추가] ---
 
-    // --- 마커 이미지 (Memo) ---
+
+
+// --- 클린업 함수 ---
+
+        return () => {
+
+// 컴포넌트 unmount 시 또는 selectedPlace 변경 시 리스너 제거
+
+            k.maps.event.removeListener(iw, 'close', handleClose);
+
+// (선택) 컴포넌트 unmount 시 인포윈도우 객체 자체를 제거할 수도 있음
+
+// if (iw) iw.setMap(null); // 지도에서 완전히 제거
+
+        };
+
+
+
+    }, [selectedPlace, myLocation]); // selectedPlace가 바뀔 때마다 이 로직을 실행
+
+
+
+    useEffect(() => {
+
+        (async () => {
+
+            try {
+
+                const res = await fetch("/data/seoul-gu.geojson");
+
+                const geojson = await res.json();
+
+
+
+                if (!geojson?.features || geojson.features.length === 0) {
+
+                    console.warn("빈 GeoJSON입니다.");
+
+                    return;
+
+                }
+
+
+
+// Polygon / MultiPolygon 만 대상으로 추출
+
+                const polys = geojson.features.filter(
+
+                    (f: any) =>
+
+                        f?.geometry &&
+
+                        (f.geometry.type === "Polygon" ||
+
+                            f.geometry.type === "MultiPolygon")
+
+                );
+
+
+
+                if (polys.length === 0) {
+
+                    console.warn("Polygon/MultiPolygon 피처가 없습니다.");
+
+                    return;
+
+                }
+
+
+
+// 첫 번째 폴리곤으로 시작
+
+                let combined: SeoulPoly | null = polys[0] as SeoulPoly;
+
+
+
+// 나머지 피처와 차례대로 union
+
+                for (let i = 1; i < polys.length; i++) {
+
+                    try {
+
+                        const fc = featureCollection([
+
+                            combined as SeoulPoly,
+
+                            polys[i] as SeoulPoly,
+
+                        ]);
+
+
+
+// Turf v7+ union 시그니처: union(FeatureCollection<Polygon|MultiPolygon>)
+
+                        const merged = union(fc) as SeoulPoly | null;
+
+
+
+                        if (merged) {
+
+                            combined = merged;
+
+                        } else {
+
+                            console.warn(
+
+                                `union 결과가 null이라 index ${i}는 스킵합니다.`
+
+                            );
+
+                        }
+
+                    } catch (err) {
+
+                        console.error(`Turf union error at index ${i}:`, err);
+
+                    }
+
+                }
+
+
+
+                setSeoulPolygon(combined);
+
+            } catch (error) {
+
+                console.error("Failed to load or process GeoJSON:", error);
+
+            }
+
+        })();
+
+    }, [selectedPlace]);
+
+
+
+// --- [수정] 길찾기 useEffect (travelMode, sortOption 추가) ---
+
+    useEffect(() => {
+
+        if (origin && destination) {
+
+// 이동 모드, 정렬 옵션이 바뀔 때마다 길찾기 API 다시 호출
+
+            handleGetDirections(origin, destination, travelMode, sortOption);
+
+        }
+
+    }, [origin, destination, travelMode, sortOption]); // 👈 4개 의존
+
+
+
+// --- 마커 이미지 ---
+
     const markerImg = useMemo(
-        () => ({
-            normal: {
-                src: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-                    `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 32 32">
-                    <circle cx="16" cy="16" r="10" fill="#374151"/><circle cx="16" cy="16" r="5" fill="white"/>
-                    </svg>`
-                )}`,
-                size: { width: 28, height: 28 },
-                options: { offset: { x: 14, y: 14 } },
-            },
-            active: {
-                src: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-                    `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-            <circle cx="16" cy="16" r="11" fill="#2563eb"/><circle cx="16" cy="16" r="6" fill="white"/>
-          </svg>`
-                )}`,
-                size: { width: 32, height: 32 },
-                options: { offset: { x: 16, y: 16 } },
-            },
-        }),
-        []
-    );
-    // [삭제] recMarkerImg (markerImg로 통합됨)
 
-    // --- 유틸 함수 ---
+        () => ({
+
+            normal: {
+
+                src: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+
+                    `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 32 32">
+
+<circle cx="16" cy="16" r="10" fill="#374151"/><circle cx="16" cy="16" r="5" fill="white"/>
+
+</svg>`
+
+                )}`,
+
+                size: { width: 28, height: 28 },
+
+                options: { offset: { x: 14, y: 14 } },
+
+            },
+
+            active: {
+
+                src: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+
+                    `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+
+<circle cx="16" cy="16" r="11" fill="#2563eb"/><circle cx="16" cy="16" r="6" fill="white"/>
+
+</svg>`
+
+                )}`,
+
+                size: { width: 32, height: 32 },
+
+                options: { offset: { x: 16, y: 16 } },
+
+            },
+
+        }),
+
+        []
+
+    );
+
+
+
+// 거리 계산 메서드
+
     const haversineKm = (a: LatLng, b: LatLng) => {
+
         const R = 6371;
+
         const dLat = (Math.PI / 180) * (b.lat - a.lat);
+
         const dLng = (Math.PI / 180) * (b.lng - a.lng);
+
         const la1 = (Math.PI / 180) * a.lat,
+
             la2 = (Math.PI / 180) * b.lat;
+
         const x =
+
             Math.sin(dLat / 2) ** 2 +
+
             Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+
         return 2 * R * Math.asin(Math.sqrt(x));
+
     };
+
+
+
+
+
+// 중앙 위치 이동 메서드
 
     const centerTo = (pos: LatLng) => {
+
         setCenter(pos);
+
         const k = (window as any).kakao;
+
         const m = mapRef.current;
+
         if (m && k?.maps) m.panTo(new k.maps.LatLng(pos.lat, pos.lng));
+
     };
+
+
+
+
+
+// 주소 -> 좌표 변환 메서드 (Geocoder 사용)
 
     const geocodeQuery = (q: string): Promise<kakao.maps.LatLng> => {
+
         return new Promise((resolve, reject) => {
+
             if (!geocoderRef.current) {
+
                 return reject(new Error("Geocoder가 준비되지 않았습니다."));
+
             }
+
             const k = (window as any).kakao;
+
             geocoderRef.current.addressSearch(q, (result, status) => {
+
                 if (status === k.maps.services.Status.OK && result.length > 0) {
+
                     const coords = new k.maps.LatLng(result[0].y, result[0].x);
+
                     resolve(coords);
+
                 } else {
-                    // 주소 검색 실패 시 키워드 검색으로 한 번 더 시도
+
+// 주소 검색 실패 시 키워드 검색으로 한 번 더 시도
+
                     placesRef.current?.keywordSearch(q, (data, status) => {
+
                         if (status === k.maps.services.Status.OK && data.length > 0) {
+
                             const coords = new k.maps.LatLng(data[0].y, data[0].x);
+
                             resolve(coords);
+
                         } else {
+
                             reject(new Error("지오코딩에 실패했거나 결과가 없습니다."));
+
                         }
+
                     });
+
                 }
+
             });
+
         });
+
     };
 
-    // --- 핸들러 함수 ---
 
+
+// --- 핸들러 ---
+
+// 현재 위치 설정 메서드
     const handleGetCurrentLocation = () => {
-        // ... (기존 코드와 동일) ...
+// ... (기존 코드와 동일) ...
+
         setErrorMsg(null);
         const fallback = () => {
             centerTo(INITIAL_CENTER);
             setMyLocation(null);
         };
         if (!navigator.geolocation) {
+
             fallback();
+
             return;
+
         }
+
         const t = setTimeout(fallback, 7000);
+
         navigator.geolocation.getCurrentPosition(
+
             ({ coords }) => {
+
                 clearTimeout(t);
+
                 const p = { lat: coords.latitude, lng: coords.longitude };
+
                 centerTo(p);
+
                 setMyLocation(p);
+
             },
+
             () => {
+
                 clearTimeout(t);
+
                 fallback();
+
             },
+
             { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
+
         );
+
     };
 
-    /**
-     * [검색 1 - 카카오] Enter키로 검색 (카카오 API)
-     */
+
+
+
+
+
+
+// 일반 검색 ver. kakao API
+
     const handleKakaoSearch = (q = query) => {
+
         const k = (window as any).kakao;
+
         if (!q.trim() || !placesRef.current) return;
 
+
+
         setIsSearchLoading(true);
+
         setResultsPanelOpen(true);
+
         setSelectedPlace(null);
 
+
+
+        const seoulBounds = new k.maps.LatLngBounds(
+
+            new k.maps.LatLng(37.413294, 126.734086), // 남서쪽 좌표
+
+            new k.maps.LatLng(37.715133, 127.269311) // 북동쪽 좌표
+
+        );
+
+
+
         placesRef.current.keywordSearch(
+
             q,
-            (data: Place[], status) => { // 👈 원본 Place 타입
+
+            async (data: Place[], status) => {
+
                 if (status === k.maps.services.Status.OK) {
+
+
+
+// 서울시 경계 내 필터링
+
+                    const filteredData = data.filter(place => {
+
+                        if (!seoulPolygon) return true; // 폴리곤 로드 안됐으면 일단 통과
+
+                        try {
+
+                            const point = turf.point([Number(place.x), Number(place.y)]);
+
+                            return turf.booleanPointInPolygon(point, seoulPolygon);
+
+                        } catch (e) {
+
+                            console.error("Point in polygon check error:", e);
+
+                            return false; // 에러 시 제외
+
+                        }
+
+                    });
+
+
 
                     const baseLocation = myLocation || center;
 
-                    // [핵심] Place[] -> AppPlace[]로 변환 (distance 포함)
-                    const spotsForPanel: AppPlace[] = data.map(place => {
+
+
+// 현재 Spring 서버 응답과 카카오 api 응답 형식이 달라서 통합해줌
+
+                    let spotsForPanel: AppPlace[] = filteredData.map(place => {
+
                         const appPlace = kakaoPlaceToAppPlace(place);
+
                         return {
+
                             ...appPlace,
-                            distance: haversineKm(baseLocation, { lat: appPlace.lat, lng: appPlace.lng })
+
+// 거리순 정렬
+
+                            distance: haversineKm(baseLocation, { lat: appPlace.lat, lng: appPlace.lng },
+
+                            )
+
                         };
+
                     });
-                    // --- 👆 [수정] ---
 
-                    setResults(spotsForPanel); // 👈 통합 state에 저장
 
-                    // 지도 경계 이동
+
+                    try {
+
+// 2. 파이썬 API 호출하여 혼잡도 추가
+
+                        spotsForPanel = await fetchCongestionData(spotsForPanel);
+
+                    } catch (error) {
+
+                        console.error("혼잡도 데이터 통합 중 오류:", error);
+
+                    }
+
+
+
+                    setResults(spotsForPanel);
+
+
+
+// 지도 경계 조정
+
                     const b = new k.maps.LatLngBounds();
+
                     spotsForPanel.forEach((d) => b.extend(new k.maps.LatLng(d.lat, d.lng)));
+
                     mapRef.current?.setBounds(b);
+
                 } else {
+
                     setResults([]);
+
                     setResultsPanelOpen(false);
+
                 }
+
                 setIsSearchLoading(false);
+
             },
-            { sort: k.maps.services.SortBy.ACCURACY }
+
+            {
+
+                sort: k.maps.services.SortBy.ACCURACY,
+
+                bounds: seoulBounds
+
+            } // 서울시 경계 내로 검색 제한
+
         );
+
     };
 
-    /**
-     * [검색 2 - 추천] "추천" 버튼으로 검색 (우리 API)
-     */
-    const handleRecommendSearch = async (q = query) => {
-        if (!q.trim()) {
-            alert("검색어를 입력해주세요.");
-            return;
+
+
+// 카카오 api 아용시 혼잡도 붙이기
+
+    const fetchCongestionData = async (places: AppPlace[]): Promise<AppPlace[]> => {
+
+        if (places.length === 0) {
+
+            return []; // 장소 목록이 없으면 바로 반환
+
         }
 
-        setIsSearchLoading(true);
-        setResultsPanelOpen(true);
-        setResults([]);
-        setSelectedPlace(null);
 
-        let location: kakao.maps.LatLng;
+
+// 1. API 요청 본문(body) 준비
+
+        const now = new Date();
+
+        const pad = (num: number) => num.toString().padStart(2, '0');
+
+        const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+        const datetime = "2025-10-01T" + time; // "YYYY-MM-DD HH:MM:SS" 형식
+
+        const locations = places.map(p => ({ lat: p.lat, lon: p.lng }));
+
+        const requestBody = {
+
+            datetime: datetime,
+
+            locations: locations
+
+        };
+
+
+
         try {
-            // 1. 검색어(q)를 좌표로 변환
-            location = await geocodeQuery(q);
-        } catch (error) {
-            console.error(error);
-            alert("검색어에 해당하는 위치를 찾을 수 없습니다.");
-            setIsSearchLoading(false);
-            setResultsPanelOpen(false);
-            return;
-        }
 
-        try {
-            // 2. API 파라미터 준비
-            const finalDateTime = new Date();
-            const pad = (num: number) => num.toString().padStart(2, '0');
-            const time = `${pad(finalDateTime.getHours())}:${pad(finalDateTime.getMinutes())}:${pad(finalDateTime.getSeconds())}`;
-            const lat = location.getLat();
-            const lon = location.getLng();
-            const categoryQuery = selectedCat || ""; // 👈 카테고리 state 사용
+// 2. 파이썬 API 호출 (POST)
 
-            // http://pp-domain.duckdns.org:8082/api/recommend/with-congestion?lat=37.5665&lon=126.9780&time=14:30:00&congestionDateTime=2025-10-23T17:00:00&types=12
+            const response = await fetch("http://127.0.0.1:5001/get-congestion", {
 
-            // 3. 우리 API 호출
-            const apiUrl = `http://pp-domain.duckdns.org:8082/api/recommend/?lat=${lat}&lon=${lon}&time=${time}&congestionDateTime=2025-10-01T17:00&type=${categoryQuery}`;
-            const response = await fetch(apiUrl);
+                method: 'POST',
+
+                headers: {
+
+                    'Content-Type': 'application/json',
+
+                },
+
+                body: JSON.stringify(requestBody),
+
+            });
+
 
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+
+                console.error("혼잡도 API 오류:", response.status, response.statusText);
+
+                return places; // 혼잡도 조회 실패 시 원본 목록 반환
+
             }
+
+
+
+            const data = await response.json();
+
+            const congestionLevels: string[] = data.congestion_levels;
+
+
+
+// 3. 결과 병합: 원본 places 배열에 congestionLevel 추가
+
+            if (congestionLevels && congestionLevels.length === places.length) {
+
+                return places.map((place, index) => ({
+
+                    ...place,
+
+                    congestionLevel: congestionLevels[index] // 해당 인덱스의 혼잡도 값 할당
+
+                }));
+
+            } else {
+
+                console.error("혼잡도 API 응답 형식 오류 또는 길이 불일치");
+
+                return places; // 형식 오류 시 원본 반환
+
+            }
+
+
+
+        } catch (error) {
+
+            console.error("혼잡도 API 호출 중 오류:", error);
+
+            return places; // 네트워크 오류 등 발생 시 원본 반환
+
+        }
+
+    };
+
+
+
+// 추천 검색 ver. Spring API
+
+    const handleRecommendSearch = async (q = query) => {
+
+        if (!q.trim()) {
+
+            alert("검색어를 입력해주세요.");
+
+            return;
+
+        }
+
+
+
+        setIsSearchLoading(true);
+
+        setResultsPanelOpen(true);
+
+        setResults([]);
+
+        setSelectedPlace(null);
+
+
+
+        let location: kakao.maps.LatLng;
+
+        try {
+
+// 1. 검색어(q)를 좌표로 변환
+
+            location = await geocodeQuery(q);
+
+        } catch (error) {
+
+            console.error(error);
+
+            alert("검색어에 해당하는 위치를 찾을 수 없습니다.");
+
+            setIsSearchLoading(false);
+
+            setResultsPanelOpen(false);
+
+            return;
+
+        }
+
+
+
+        try {
+
+            const finalDateTime = new Date();
+
+            const pad = (num: number) => num.toString().padStart(2, '0');
+
+            const time = `${pad(finalDateTime.getHours())}:${pad(finalDateTime.getMinutes())}:${pad(finalDateTime.getSeconds())}`;
+
+            const lat = location.getLat();
+
+            const lon = location.getLng();
+
+            const categoryQuery = selectedCat || ""; // 카테고리 상태 반영
+
+
+
+// http://pp-domain.duckdns.org:8082/api/recommend/with-congestion?lat=37.5665&lon=126.9780&time=14:30:00&congestionDateTime=2025-10-01T17:00:00&types=12
+
+
+
+// Spring API 호출
+
+            const apiUrl = `http://pp-domain.duckdns.org:8082/api/recommend/?lat=${lat}&lon=${lon}&time=${time}&congestionDateTime=2025-10-01T${time}&type=${categoryQuery}`;
+
+            const response = await fetch(apiUrl);
+
+
+
+
+
+            if (!response.ok) {
+
+                throw new Error(`HTTP error! status: ${response.status}`);
+
+            }
+
+
 
             const apiResponse = await response.json();
+
             const resultsData = apiResponse[0]?.results as Record<string, Rec[]>;
 
+
+
             if (!resultsData) {
+
                 alert("추천 장소를 가져오지 못했습니다.");
+
                 setResults([]);
+
                 return;
+
             }
 
-            // 4. 카테고리 필터링
+
+
+// 4. 카테고리 필터링
+
             const categoryIdToKeyMap: { [key: string]: string } = {
+
                 "12": "tourist_attraction", "14": "cultural_facilities", "15": "festivals_performances_events",
+
                 "25": "travel_course", "28": "leisure_sports", "32": "accommodation", "38": "shopping", "39": "food",
+
             };
 
+
+
             let allSpots: Rec[] = []; // 👈 원본 Rec(ApiRec) 타입
+
             if (categoryQuery && categoryIdToKeyMap[categoryQuery]) {
+
                 allSpots = resultsData[categoryIdToKeyMap[categoryQuery]] || [];
+
             } else {
+
                 allSpots = Object.values(resultsData).flat();
+
             }
+
+
 
             if (allSpots.length === 0) {
+
                 alert("해당 조건에 맞는 추천 장소가 없습니다.");
+
                 setResults([]);
+
                 return;
+
             }
 
-            // 5. [핵심] Rec[] -> AppPlace[]로 변환
+
+
+// 5. [핵심] Rec[] -> AppPlace[]로 변환
+
             const spotsForPanel: AppPlace[] = allSpots.map(recToAppPlace);
 
 
-            // 7. [핵심] 통합된 state에 저장
+
+
+
+// 7. [핵심] 통합된 state에 저장
+
             setResults(spotsForPanel);
 
-            // 8. 지도 이동
+
+
+// 8. 지도 이동
+
             const k = (window as any).kakao;
+
             const b = new k.maps.LatLngBounds();
+
             spotsForPanel.forEach((d) => b.extend(new k.maps.LatLng(d.lat, d.lng)));
+
             b.extend(location); // 검색 중심점도 포함
+
             mapRef.current?.setBounds(b);
 
+
+
         } catch (error) {
+
             console.error("추천 검색 처리 중 오류:", error);
+
             alert("추천 검색 중 오류가 발생했습니다.");
+
             setResultsPanelOpen(false);
+
+        } finally {
+
+            setIsSearchLoading(false);
+
+        }
+
+    };
+
+
+
+    /**
+
+     * 자동완성 항목 클릭 (검색창 채우기만 함)
+
+     */
+
+    const handleSuggestionSelect = (item: AutoCompleteItem) => {
+
+        setQuery(item.place_name);
+
+        setIsSearchFocused(false);
+
+    };
+
+
+
+    /**
+
+     * 카테고리 버튼 클릭 (state 변경만 함)
+
+     */
+
+    const handleCategoryChange = (code: string | null) => {
+
+        if (code === null || code === selectedCat) {
+
+            setSelectedCat(null); // (resetCategory 단순화)
+
+            return;
+
+        }
+
+        setSelectedCat(code);
+
+    };
+
+
+
+    /**
+
+     * [수정] 상세보기 클릭 (확대 레벨 3 적용)
+
+     */
+
+    const handleResultItemClick = (item: AppPlace) => {
+
+        setSelectedPlace(item); // 1. 상세보기 state 저장
+
+
+
+        const pos = { lat: item.lat, lng: item.lng };
+
+        setCenter(pos); // 2. React center state 동기화
+
+
+
+        const k = (window as any).kakao;
+
+        const m = mapRef.current; // 3. 지도 객체 가져오기
+
+
+
+        if (m && k?.maps) {
+
+            const moveLatLon = new k.maps.LatLng(pos.lat, pos.lng);
+
+            m.panTo(moveLatLon); // 4. 부드럽게 이동
+
+            m.setLevel(3, { animate: true }); // 5. 레벨 3으로 확대
+
+        }
+
+    };
+
+
+
+    /**
+
+     * [수정] 검색창 X버튼 (전체 초기화)
+
+     */
+
+    const handleClearSearch = () => {
+
+        setQuery(""); // 검색창 텍스트
+
+        setResults([]); // 결과 목록 (마커)
+
+        setSelectedPlace(null); // 상세보기 (인포윈도우)
+
+        setResultsPanelOpen(false); // 패널
+
+        setIsSearchFocused(false); // 포커스
+
+        setSelectedCat(null); // 카테고리
+
+
+
+// 길찾기 관련 state 초기화
+
+        setOrigin(null);
+
+        setDestination(null);
+
+        setActiveRoute(null);
+
+        setRouteSegments(null);
+
+        setSortOption('duration');
+
+        setOrigin(null);
+
+        setDestination(null);
+
+        setRoutePanelOpen(false);
+
+        setRouteSegments(null); // 👈 폴리라인
+
+        setWalkSummary(null); // 👈 도보 데이터
+
+        setTransitRoutes(null); // 👈 대중교통 데이터
+
+        setTravelMode('walk'); // 👈 이동 모드 초기화
+
+        setSortOption('duration'); // 👈 정렬 옵션 초기화
+
+    };
+
+
+
+    /**
+
+     * AI 챗봇 전송
+
+     */
+
+    const handleAiSummit = async (textOverride?: string) => {
+
+// ... (기존 코드와 동일) ...
+
+        const textToSend = textOverride || aiQuery;
+
+        const trimmedQuery = textToSend.trim();
+
+        if (!trimmedQuery || isLoading) return;
+
+        const newUserMessage: ChatMessage = { id: Date.now(), text: trimmedQuery, sender: 'user' };
+
+        const currentMessages = [...messages, newUserMessage];
+
+        setMessages(currentMessages);
+
+        setAiQuery("");
+
+        setIsLoading(true);
+
+        try {
+
+            const response = await fetch('/api/chat', {
+
+                method: 'POST',
+
+                headers: { 'Content-Type': 'application/json' },
+
+                body: JSON.stringify({ messages: currentMessages }),
+
+            });
+
+            if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+
+            const data = await response.json();
+
+            const aiResponse: ChatMessage = { id: Date.now() + 1, text: data.text, sender: 'ai' };
+
+            setMessages(prevMessages => [...prevMessages, aiResponse]);
+
+        } catch (error) {
+
+            console.error("Failed to fetch AI response:", error);
+
+            const errorResponse: ChatMessage = { id: Date.now() + 1, text: "죄송합니다. 응답을 가져오는 중 오류가 발생했습니다.", sender: 'ai' };
+
+            setMessages(prevMessages => [...prevMessages, errorResponse]);
+
+        } finally {
+
+            setIsLoading(false);
+
+        }
+
+    };
+
+
+
+    const handleGetDirections = async (
+        startPoint: AppPlace,
+        endPoint: AppPlace,
+        mode: 'walk' | 'transit',
+        sort: 'duration' | 'congestion'
+    ) => {
+
+        setIsSearchLoading(true);
+        // 모든 경로 state 초기화
+        setRouteSegments(null);
+        setWalkSummary(null);
+        setTransitRoutes(null);
+        // setRoutePanelOpen(false); // (깜빡임 방지를 위해 닫지 않음)
+
+        try {
+            let requestBody: any;
+
+            // 1. 모드에 따라 다른 요청 본문 생성
+            if (mode === 'transit') {
+                requestBody = {
+                    startX: startPoint.lng, startY: startPoint.lat,
+                    endX: endPoint.lng, endY: endPoint.lat,
+                    mode: "transit",
+                    departureTime: new Date().toISOString()
+                };
+            } else {
+                requestBody = {
+                    startX: startPoint.lng, startY: startPoint.lat,
+                    endX: endPoint.lng, endY: endPoint.lat,
+                    sort: sort,
+                    departureTime: new Date().toISOString()
+                };
+            }
+
+            // 2. Spring API 호출
+            const response = await fetch("http://pp-domain.duckdns.org:8082/api/route", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody),
+            });
+
+            if (!response.ok) {
+                throw new Error('길찾기 API 호출 실패');
+            }
+
+            const data = await response.json();
+
+            // 3. [분기] 응답 형식이 다르므로 로직을 완전히 분리
+            let routesFound = false;
+
+            // 3-1. [대중교통] 응답 (Array) 처리
+            if (mode === 'transit' && Array.isArray(data) && data.length > 0) {
+
+                const transitData = data as TransitRoute[];
+                setTransitRoutes(transitData);
+
+                // 대중교통 응답의 첫 경로에서 'congestionPoints' 파싱 시도 (있으면 그리고, 없으면 안 그림)
+                const firstRoute = transitData[0];
+                if (firstRoute.congestionPoints) {
+                    parseAndSetPolyline(firstRoute.congestionPoints);
+                } else {
+                    setRouteSegments(null); // 좌표 없으면 폴리라인 null
+                }
+                routesFound = true;
+
+            }
+            // 3-2. [도보] 응답 (Object) 처리
+            else if (mode === 'walk' && data && data.routes && Array.isArray(data.routes) && data.routes.length > 0) {
+
+                const firstRoute = data.routes[0];
+                const summary: WalkRouteSummary = {
+                    duration: firstRoute.durationInSeconds,
+                    distance: firstRoute.distanceInMeters,
+                    score: firstRoute.congestionScore,
+                    instructions: firstRoute.instructions || []
+                };
+                setWalkSummary(summary);
+
+                // 도보 경로 폴리라인 그리기
+                parseAndSetPolyline(firstRoute.congestionPoints || []);
+                routesFound = true;
+            }
+            // --- [수정 완료] ---
+
+            // 4. 경로 검색 실패 시 알림
+            if (!routesFound) {
+                alert("경로 정보를 찾을 수 없습니다.");
+                setRoutePanelOpen(false); // 경로가 없으면 패널도 닫기
+                return;
+            }
+
+            // 5. 패널 열기
+            setRoutePanelOpen(true);
+            setResultsPanelOpen(false);
+            setSelectedPlace(null);
+
+        } catch (error) {
+            console.error("길찾기 오류:", error);
+            // @ts-ignore
+            alert(`길찾기 중 오류가 발생했습니다: ${error.message}`);
         } finally {
             setIsSearchLoading(false);
         }
     };
 
-    /**
-     * 자동완성 항목 클릭 (검색창 채우기만 함)
-     */
-    const handleSuggestionSelect = (item: AutoCompleteItem) => {
-        setQuery(item.place_name);
-        setIsSearchFocused(false);
-    };
+    // --- 👇 [수정] parseAndSetPolyline 함수 ---
 
-    /**
-     * 카테고리 버튼 클릭 (state 변경만 함)
-     */
-    const handleCategoryChange = (code: string | null) => {
-        if (code === null || code === selectedCat) {
-            setSelectedCat(null); // (resetCategory 단순화)
+    /** 폴리라인 파싱 함수 (congestionPoints가 없는 경우도 처리) */
+
+    const parseAndSetPolyline = (congestionPoints: { latitude: number; longitude: number; congestionLevel: string }[]) => {
+        // [수정] congestionPoints가 null이거나 비어있으면 즉시 종료
+        if (!congestionPoints || congestionPoints.length < 2) {
+            setRouteSegments(null);
             return;
         }
-        setSelectedCat(code);
-    };
-
-    /**
-     * [수정] 상세보기 클릭 (확대 레벨 3 적용)
-     */
-    const handleResultItemClick = (item: AppPlace) => {
-        setSelectedPlace(item); // 1. 상세보기 state 저장
-
-        const pos = { lat: item.lat, lng: item.lng };
-        setCenter(pos); // 2. React center state 동기화
-
-        const k = (window as any).kakao;
-        const m = mapRef.current; // 3. 지도 객체 가져오기
-
-        if (m && k?.maps) {
-            const moveLatLon = new k.maps.LatLng(pos.lat, pos.lng);
-            m.panTo(moveLatLon); // 4. 부드럽게 이동
-            m.setLevel(3, { animate: true }); // 5. 레벨 3으로 확대
+        const segments: RouteSegment[] = [];
+        let currentSegment: RouteSegment = {
+            path: [],
+            color: colorFor(congestionPoints[0].congestionLevel)
+        };
+        for (let i = 0; i < congestionPoints.length; i++) {
+        // ... (기존 for 루프 로직은 동일) ...
+            const point = congestionPoints[i];
+            const latLng = { lat: point.latitude, lng: point.longitude };
+            const color = colorFor(point.congestionLevel);
+            if (i === 0) {
+                currentSegment.path.push(latLng);
+            } else {
+                if (color !== currentSegment.color) {
+                    segments.push(currentSegment);
+                    const lastPoint = currentSegment.path[currentSegment.path.length - 1];
+                    currentSegment = { path: [lastPoint, latLng], color: color };
+                } else {
+                    currentSegment.path.push(latLng);
+                }
+            }
         }
-    };
+        segments.push(currentSegment);
+        setRouteSegments(segments);
+        // 지도 범위 조정
+        const bounds = new (window as any).kakao.maps.LatLngBounds();
+        congestionPoints.forEach((p) => bounds.extend(new (window as any).kakao.maps.LatLng(p.latitude, p.longitude)));
+        mapRef.current?.setBounds(bounds);
+    }
+// --- 렌더링 섹션 ---
 
-    /**
-     * [수정] 검색창 X버튼 (전체 초기화)
-     */
-    const handleClearSearch = () => {
-        setQuery("");                // 1. 검색창 텍스트
-        setResults([]);            // 2. 결과 목록 (마커)
-        setSelectedPlace(null);    // 3. 상세보기 (인포윈도우)
-        setResultsPanelOpen(false);  // 4. 패널
-        setIsSearchFocused(false);   // 5. 포커스
-        setSelectedCat(null);        // 6. 카테고리
-    };
-
-    /**
-     * AI 챗봇 전송
-     */
-    const handleAiSummit = async (textOverride?: string) => {
-        // ... (기존 코드와 동일) ...
-        const textToSend = textOverride || aiQuery;
-        const trimmedQuery = textToSend.trim();
-        if (!trimmedQuery || isLoading) return;
-        const newUserMessage: ChatMessage = { id: Date.now(), text: trimmedQuery, sender: 'user' };
-        const currentMessages = [...messages, newUserMessage];
-        setMessages(currentMessages);
-        setAiQuery("");
-        setIsLoading(true);
-        try {
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ messages: currentMessages }),
-            });
-            if (!response.ok) throw new Error(`API error: ${response.statusText}`);
-            const data = await response.json();
-            const aiResponse: ChatMessage = { id: Date.now() + 1, text: data.text, sender: 'ai' };
-            setMessages(prevMessages => [...prevMessages, aiResponse]);
-        } catch (error) {
-            console.error("Failed to fetch AI response:", error);
-            const errorResponse: ChatMessage = { id: Date.now() + 1, text: "죄송합니다. 응답을 가져오는 중 오류가 발생했습니다.", sender: 'ai' };
-            setMessages(prevMessages => [...prevMessages, errorResponse]);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // --- 렌더링 섹션 ---
     return (
+
         <div className="w-full h-full relative overflow-hidden">
+
             {/* 1. 지도 */}
+
             <div className="absolute inset-0">
+
                 <Map
+
                     center={center}
+
                     level={3}
+
                     style={{ width: "100%", height: "100%" }}
+
                     onCreate={(m) => (mapRef.current = m)}
+
                 >
+
                     {myLocation &&
+
                         <MapMarker position={myLocation} image={myImage} zIndex={999} />}
+
+
 
                     {/* --- 👇 [수정] --- */}
 
+
+
                     {/* [요청 1] 상세검색 시에도 모든 마커를 표시합니다.
-                      - selectedPlace ? : ... (삼항 연산자)를 제거합니다.
-                      - results.map()을 항상 실행합니다.
-                    */}
+
+- selectedPlace ? : ... (삼항 연산자)를 제거합니다.
+
+- results.map()을 항상 실행합니다.
+
+*/}
+
                     {results.map((r) => { // 👈 r은 AppPlace
+
                         const pos = { lat: r.lat, lng: r.lng };
-                        // 👈 현재 아이템이 선택된 아이템(selectedPlace)인지 확인
+
+// 👈 현재 아이템이 선택된 아이템(selectedPlace)인지 확인
+
                         const active = r.id === selectedPlace?.id;
 
+
+
                         return (
+
                             <MapMarker
+
                                 key={`item-${r.id}`}
+
                                 position={pos}
+
                                 // 👈 active 상태에 따라 이미지와 zIndex 변경
+
                                 image={active ? markerImg.active : markerImg.normal}
+
                                 title={r.name}
+
                                 zIndex={active ? 10 : 0} // 👈 선택된 마커가 위로 오도록
+
                                 onClick={() => {
+
                                     handleResultItemClick(r);
+
                                 }}
+
                             />
+
                         );
+
                     })}
 
-                    {/*
-                      [요청 2] MapInfoWindow를 수정합니다.
-                      - selectedPlace가 있을 때만 렌더링합니다.
-                      - removable={true}와 onClose를 사용해 기본 UI를 활용합니다.
-                      - [버그 수정] selectedPlace의 속성명을 AppPlace 기준으로 수정합니다.
-                    */}
-                    {selectedPlace && (
-                        <MapInfoWindow
-                            // --- 👇 [수정] ---
-                            onCreate={(iw) => (infoWindowRef.current = iw)} // 👈 ref 대신 onCreate 사용
-                            position={{ lat: selectedPlace.lat, lng: selectedPlace.lng }}
-                            removable={true}  // 👈 기본 UI ('X' 버튼, 말풍선) 사용
-                            // --- 👆 [수정] ---
-                        >
-                            {/* 기본 UI를 쓰므로, 커스텀 'X' 버튼과 배경 스타일은 제거합니다.
-                              padding-right(30px)를 주어 'X' 버튼과 겹치지 않게 합니다.
-                            */}
-                            <div style={{ padding: '5px 30px 5px 5px', width: 'auto', minWidth: '200px' }}>
-                                <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
-                                    {selectedPlace.name}
-                                </div>
-                                <div style={{ fontSize: '13px' }}>
-                                    {selectedPlace.address}
-                                </div>
-                                <div style={{ fontSize: '12px', color: '#888', marginTop: '3px' }}>
-                                    {selectedPlace.category}
-                                </div>
-                                {selectedPlace.congestionLevel && (
-                                    <div style={{ fontSize: '13px', color: '#059669', marginTop: '3px', fontWeight: 'bold' }}>
-                                        혼잡도: {selectedPlace.congestionLevel}
-                                    </div>
-                                )}
-                                {selectedPlace.phone && (
-                                    <div style={{ fontSize: '13px', color: 'green', marginTop: '3px' }}>
-                                        {selectedPlace.phone}
-                                    </div>
-                                )}
-                                {selectedPlace.placeUrl && (
-                                    <a
-                                        href={selectedPlace.placeUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        style={{ color: 'blue', textDecoration: 'none', fontSize: '12px', marginTop: '5px', display: 'inline-block' }}
-                                    >
-                                        카카오맵에서 상세보기
-                                    </a>
-                                )}
-                            </div>
-                        </MapInfoWindow>
-                    )}
-                    {/* --- 👆👆 수정 완료 --- */}
+
+
+                    {/* [요청 2] 길찾기 경로 표시 */}
+
+                    {routeSegments && routeSegments.map((seg, index) => (
+
+                        <Polyline
+
+                            key={`route-seg-${index}`}
+
+                            path={seg.path}
+
+                            strokeWeight={6}
+
+                            strokeColor={seg.color}
+
+                            strokeOpacity={0.8}
+
+                            strokeStyle={"solid"}
+
+                        />
+
+                    ))}
+
                 </Map>
+
             </div>
 
+
+
             {/* 2. 왼쪽 패널 */}
+
             <ResultPanel
+
                 open={resultsPanelOpen}
+
                 items={results} // 👈 AppPlace[] 전달
+
                 activeId={selectedPlace?.id ?? null}
+
                 onClose={() => {
+
                     setResultsPanelOpen(false);
+
                     setSelectedPlace(null);
+
                 }}
+
                 onSelect={(item) => {
                     // ResultPanel의 items가 AppPlace[]이므로 item은 AppPlace
                     handleResultItemClick(item as AppPlace);
@@ -647,10 +2025,36 @@ export default function MapContainer() {
                 topMobileRem={9}
                 topDesktopRem={5}
             />
-
+            <RoutePanel
+                open={routePanelOpen}
+                originName={origin?.name}
+                destinationName={destination?.name}
+                // 모드 관련
+                travelMode={travelMode}
+                onTravelModeChange={(mode) => setTravelMode(mode)}
+                // 도보 경로 관련
+                sortOption={sortOption}
+                onSortChange={(sort) => setSortOption(sort)}
+                walkSummary={walkSummary}
+                // 대중교통 경로 관련
+                transitRoutes={transitRoutes}
+                // 뒤로가기 핸들러
+                onBack={() => {
+                    setRoutePanelOpen(false); // 경로 패널 닫기
+                    setRouteSegments(null); // 폴리라인 지우기
+                    setWalkSummary(null); // 도보 데이터 지우기
+                    setTransitRoutes(null); // 대중교통 데이터 지우기
+                    setOrigin(null); // 출발지 초기화
+                    setDestination(null); // 도착지 초기화
+                    setTravelMode('walk'); // 모드 초기화
+                    // 검색 결과가 있었다면 검색 패널 다시 열기
+                    if (results.length > 0) {
+                        setResultsPanelOpen(true);
+                    }
+                }}
+            />
             {/* 3. 상단 UI (검색, 버튼, 카테고리) */}
             <div className="absolute top-4 left-4 right-4 md:left-4 z-[1400] flex flex-col gap-2 md:flex-row md:items-center">
-
                 {/* 1. 검색창 (TopSearchBar가 '검색' 버튼 포함) */}
                 <div className="w-full md:w-auto md:min-w-[360px]">
                     <TopSearchBar
@@ -676,7 +2080,6 @@ export default function MapContainer() {
                         <AutoComplete suggestions={suggestions} onSelect={handleSuggestionSelect} />
                     </TopSearchBar>
                 </div>
-
                 {/* 2. "추천" 버튼 */}
                 <button
                     type="button"
@@ -686,7 +2089,6 @@ export default function MapContainer() {
                 >
                     추천
                 </button>
-
                 {/* 3. 카테고리 */}
                 <Categories
                     items={CAT_ITEMS}
@@ -694,13 +2096,11 @@ export default function MapContainer() {
                     onChange={handleCategoryChange}
                     className="w-full md:min-w-0 md:flex-1"
                 />
-
                 {/* 4. AI 버튼 */}
                 <div className="self-end md:self-auto">
                     <AiButton onClick={() => setAiChatOpen(true)} />
                 </div>
             </div>
-
             {/* 4. AI 패널 */}
             <AiAssistantPanel
                 open={aiChatOpen}
@@ -711,7 +2111,6 @@ export default function MapContainer() {
                 onQueryChange={setAiQuery}
                 messages={messages}
             />
-
             {/* 5. 현재 위치 버튼 */}
             <CurrentLocationButton onClick={handleGetCurrentLocation} />
         </div>

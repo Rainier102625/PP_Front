@@ -5,7 +5,7 @@ export type District = {
     pos: { top: number; left: number };   // 화면 배치(%)
 };
 
-export type CongestionLevel = "여유" | "보통" | "붐빔";
+export type CongestionLevel = "여유" | "보통" |"약간 붐빔"|"붐빔";
 
 export const DISTRICTS: District[] = [
     { id: "eunpyeong",  nameKo: "은평구",   center:{lat:37.6176,lng:126.9227}, pos:{top:15,left:21} },
