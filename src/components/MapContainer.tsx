@@ -2,8 +2,6 @@
 
 "use client";
 
-
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Map, MapMarker, useKakaoLoader, Polyline } from "react-kakao-maps-sdk";
 import TopSearchBar from "@/components/TopSearchBar";
@@ -20,6 +18,10 @@ import * as turf from '@turf/turf';
 import {Polygon, MultiPolygon, Feature} from 'geojson';
 import {featureCollection } from "@turf/helpers";
 import { union } from "@turf/turf";
+// @ts-ignore
+import { WalkRouteSummary, TransitSegment, TransitRoute, AppPlace} from "@/types/route";
+
+
 // --- 타입 정의 섹션 ---
 
 // 서울시 경계 폴리곤 타입
@@ -296,23 +298,83 @@ const myImage = {
 
 } as const;
 
+const startMarkerImg = {
+    src: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+            <circle cx="16" cy="16" r="11" fill="#10b981"/>
+            <circle cx="16" cy="16" r="6" fill="white"/>
+        </svg>`
+    )}`,
+    size: { width: 32, height: 32 },
+    options: { offset: { x: 16, y: 16 } },
+} as const;
 
+const destMarkerImg = {
+    src: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+            <circle cx="16" cy="16" r="11" fill="#ef4444"/>
+            <circle cx="16" cy="16" r="6" fill="white"/>
+        </svg>`
+    )}`,
+    size: { width: 32, height: 32 },
+    options: { offset: { x: 16, y: 16 } },
+} as const;
 
 // 혼잡도에 따른 색상 반환 함수
-
 function colorFor(v: string) {
-
     if (v === '붐빔') return "#ff5a5a"; // 붐빔(빨강)
-
     if (v === '약간붐빔' || v === '약간 붐빔') return "#febd1a"; // 약간 붐빔(노랑)
-
     if (v === '보통') return "#4e89ff";// 보통(파랑)
-
     return "#35b26f"; // 여유(초록)
-
+}
+function colorForTransitMode(mode: string): string {
+    if (mode === "WALK") return "#888888";        // 회색
+    if (mode === "SUBWAY") return "#22c55e";      // 지하철 = 초록
+    if (mode === "BUS" || mode === "EXPRESSBUS") return "#2563eb"; // 버스 = 파랑
+    return "#000000"; // fallback
 }
 
+function buildTransitPolylineSegments(route: TransitRoute) {
+    const segs: { path: {lat:number; lng:number}[], color: string }[] = [];
 
+    route.segments.forEach((seg) => {
+        // 좌표가 제대로 있는 구간만
+        if (
+            typeof seg.startX === "number" &&
+            typeof seg.startY === "number" &&
+            typeof seg.endX === "number" &&
+            typeof seg.endY === "number"
+        ) {
+            const color = colorForTransitMode(seg.mode);
+
+            segs.push({
+                path: [
+                    { lat: seg.startY, lng: seg.startX }, // Kakao Polyline은 {lat,lng}
+                    { lat: seg.endY,   lng: seg.endX   },
+                ],
+                color,
+            });
+        }
+    });
+
+    return segs;
+}
+
+function fitMapToRouteSegments(
+    kakaoMaps: any,
+    mapObj: kakao.maps.Map | null,
+    segs: { path: {lat:number; lng:number}[] }[]
+) {
+    if (!mapObj || !kakaoMaps || !segs.length) return;
+
+    const bounds = new kakaoMaps.LatLngBounds();
+    segs.forEach(seg => {
+        seg.path.forEach(p => {
+            bounds.extend(new kakaoMaps.LatLng(p.lat, p.lng));
+        });
+    });
+    mapObj.setBounds(bounds);
+}
 
 export default function MapContainer() {
 
@@ -424,9 +486,8 @@ export default function MapContainer() {
 
     const [transitRoutes, setTransitRoutes] = useState<TransitRoute[] | null>(null);
 
-// ---
-
-
+    // 어떤 대중교통 경로(index)가 선택/확장되어 있는지
+    const [activeTransitIndex, setActiveTransitIndex] = useState<number | null>(null);
 
 // kakao refs
 
@@ -463,127 +524,61 @@ export default function MapContainer() {
 // --- kakao SDK 준비 ---
 
     useEffect(() => {
-
         if (loading) return;
-
         const k = (window as any).kakao;
-
         if (k?.maps?.services) {
-
             if (!placesRef.current) {
-
                 placesRef.current = new k.maps.services.Places();
-
             }
-
             if (!geocoderRef.current) {
-
                 geocoderRef.current = new k.maps.services.Geocoder();
-
             }
-
         }
-
         handleGetCurrentLocation();
-
     }, [loading]);
 
-
-
 // --- 자동완성 (Kakao API) ---
-
     useEffect(() => {
-
         const k = (window as any).kakao;
-
         if (!isSearchFocused || !query.trim() || !placesRef.current) {
-
             setSuggestions([]);
-
             return;
-
         }
-
-
-
         const seoulBounds = new k.maps.LatLngBounds(
-
             new k.maps.LatLng(37.413294, 126.734086), // 남서쪽 좌표
-
             new k.maps.LatLng(37.715133, 127.269311) // 북동쪽 좌표
-
         );
-
-
-
         const t = setTimeout(() => {
-
             placesRef.current!.keywordSearch(
-
                 query,
-
                 (data, status) => {
-
                     if (status === k.maps.services.Status.OK) {
-
                         setSuggestions(
-
                             data.slice(0, 10).map((d) => ({
-
                                 id: d.id,
-
                                 place_name: d.place_name,
-
                                 road_address_name: d.road_address_name || d.address_name || "",
-
                                 x: d.x,
-
                                 y: d.y,
-
                             }))
-
                         );
-
                     } else setSuggestions([]);
-
                 },
-
                 { sort: k.maps.services.SortBy.ACCURACY,
-
                     bounds: seoulBounds } // 서울시 경계 내로 검색 제한
-
             );
-
         }, 200);
-
         return () => {
-
             clearTimeout(t);
-
             infoWindowRef.current = null;
-
         };
-
     }, [query, isSearchFocused]);
-
-
-
 //상세 정보 닫기 버튼 감지
-
     useEffect(() => {
-
         const k = (window as any).kakao;
-
         if (!k?.maps || !mapRef.current) return; // 카카오맵이나 지도 객체가 없으면 종료
-
-
-
         const map = mapRef.current; // 지도 객체 가져오기
-
-
-
 // --- InfoWindow 생성 (한 번만) ---
-
         if (!infoWindowRef.current) {
 
             infoWindowRef.current = new k.maps.InfoWindow({
@@ -1749,11 +1744,12 @@ ${selectedPlace.congestionLevel ? `<div style="font-size: 13px; color: #059669; 
     ) => {
         setIsSearchLoading(true);
 
-        // 기존 경로/정보 초기화
+        // 초기화
         setRouteSegments(null);
         setWalkSummary(null);
         setTransitRoutes(null);
-        // setRoutePanelOpen(false); // 깜빡임 방지로 그대로 둬도 됨
+        // setRoutePanelOpen(false); // 깜빡임 방지로 유지해도 ok
+        setActiveTransitIndex(null);
 
         try {
             // 1. 요청 바디
@@ -1778,29 +1774,22 @@ ${selectedPlace.congestionLevel ? `<div style="font-size: 13px; color: #059669; 
                 };
             }
 
-            console.log('[handleGetDirections] requestBody:', requestBody);
-
-            // 2. API 호출
             const response = await fetch("http://pp-domain.duckdns.org:8082/api/route", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody),
             });
 
-            console.log('[handleGetDirections] status:', response.status);
-
             if (!response.ok) {
                 throw new Error(`길찾기 API 호출 실패 (${response.status})`);
             }
 
             const data = await response.json();
-            console.log('[handleGetDirections] raw data:', data);
 
             let routesFound = false;
 
-            // ---------- (A) 대중교통 모드 처리 ----------
+            // ---------- 대중교통 모드 ----------
             if (mode === 'transit') {
-                // 실제 백엔드: { transitRoutes: [ ... ] }
                 if (
                     data &&
                     Array.isArray(data.transitRoutes) &&
@@ -1808,19 +1797,24 @@ ${selectedPlace.congestionLevel ? `<div style="font-size: 13px; color: #059669; 
                 ) {
                     const transitData = data.transitRoutes as TransitRoute[];
 
-                    // 1) 패널에 뿌릴 데이터 저장
                     setTransitRoutes(transitData);
 
-                    // 2) 지도 라인(폴리라인)
-                    //    지금 백엔드 응답에는 좌표(latitude/longitude)가 없음.
-                    //    => 현재로선 경로 라인을 그릴 수 없으므로 null로 유지.
-                    setRouteSegments(null);
+                    // 기본으로 0번째 루트 선택
+                    setActiveTransitIndex(0);
+
+                    // 지도 라인 세팅
+                    const firstSegs = buildTransitPolylineSegments(transitData[0]);
+                    setRouteSegments(firstSegs);
+
+                    // 지도 bounds 맞추기
+                    const k = (window as any).kakao;
+                    fitMapToRouteSegments(k.maps, mapRef.current, firstSegs);
 
                     routesFound = true;
                 }
             }
 
-            // ---------- (B) 도보 모드 처리 ----------
+            // ---------- 도보 모드 ----------
             if (!routesFound && mode === 'walk') {
                 if (
                     data &&
@@ -1838,24 +1832,23 @@ ${selectedPlace.congestionLevel ? `<div style="font-size: 13px; color: #059669; 
                     };
                     setWalkSummary(summary);
 
-                    // 도보일 때는 서버에서 congestionPoints [{latitude, longitude, congestionLevel}, ...] 가 온다고 가정
+                    // 도보 전용 라인 (혼잡도 색)
                     parseAndSetPolyline(firstRoute.congestionPoints || []);
 
                     routesFound = true;
                 }
             }
-            // ---------- (C) 결과 처리 ----------
+
+            // ---------- 패널/화면 전환 ----------
             if (routesFound) {
-                // 경로가 정상적으로 파싱된 경우
                 setRoutePanelOpen(true);
                 setResultsPanelOpen(false);
                 setSelectedPlace(null);
             } else {
-                // 경로 못 찾은 경우
-                console.warn('[handleGetDirections] routesFound = false. data=', data);
                 alert("경로 정보를 찾을 수 없습니다.");
                 setRoutePanelOpen(false);
             }
+
         } catch (error: any) {
             console.error("길찾기 오류:", error);
             alert(`길찾기 중 오류가 발생했습니다: ${error.message || error}`);
@@ -1863,7 +1856,6 @@ ${selectedPlace.congestionLevel ? `<div style="font-size: 13px; color: #059669; 
             setIsSearchLoading(false);
         }
     };
-
     // --- 👇 [수정] parseAndSetPolyline 함수 ---
 
     /** 폴리라인 파싱 함수 (congestionPoints가 없는 경우도 처리) */
@@ -1916,129 +1908,81 @@ ${selectedPlace.congestionLevel ? `<div style="font-size: 13px; color: #059669; 
 
     // --- 렌더링 섹션 ---
     return (
-
         <div className="w-full h-full relative overflow-hidden">
-
             {/* 1. 지도 */}
-
             <div className="absolute inset-0">
-
                 <Map
-
                     center={center}
-
                     level={3}
-
                     style={{ width: "100%", height: "100%" }}
-
                     onCreate={(m) => (mapRef.current = m)}
-
                 >
-
+                    {/* 현재 내 위치 마커 (이건 항상 보이게 둘지 여부는 너 마음) */}
                     {myLocation &&
+                        <MapMarker position={myLocation} image={myImage} zIndex={999} />
+                    }
 
-                        <MapMarker position={myLocation} image={myImage} zIndex={999} />}
-
-
-
-                    {/* --- 👇 [수정] --- */}
-
-
-
-                    {/* [요청 1] 상세검색 시에도 모든 마커를 표시합니다.
-
-- selectedPlace ? : ... (삼항 연산자)를 제거합니다.
-
-- results.map()을 항상 실행합니다.
-
-*/}
-
-                    {results.map((r) => { // 👈 r은 AppPlace
-
+                    {/* 검색 결과 마커들: 길찾기 패널이 열려있지 않을 때만 표시 */}
+                    {!routePanelOpen && results.map((r) => {
                         const pos = { lat: r.lat, lng: r.lng };
-
-// 👈 현재 아이템이 선택된 아이템(selectedPlace)인지 확인
-
                         const active = r.id === selectedPlace?.id;
 
-
-
                         return (
-
                             <MapMarker
-
                                 key={`item-${r.id}`}
-
                                 position={pos}
-
-                                // 👈 active 상태에 따라 이미지와 zIndex 변경
-
                                 image={active ? markerImg.active : markerImg.normal}
-
                                 title={r.name}
-
-                                zIndex={active ? 10 : 0} // 👈 선택된 마커가 위로 오도록
-
+                                zIndex={active ? 10 : 0}
                                 onClick={() => {
-
                                     handleResultItemClick(r);
-
                                 }}
-
                             />
-
                         );
-
                     })}
 
-
-
-                    {/* [요청 2] 길찾기 경로 표시 */}
-
-                    {routeSegments && routeSegments.map((seg, index) => (
-
-                        <Polyline
-
-                            key={`route-seg-${index}`}
-
-                            path={seg.path}
-
-                            strokeWeight={6}
-
-                            strokeColor={seg.color}
-
-                            strokeOpacity={0.8}
-
-                            strokeStyle={"solid"}
-
+                    {/* 출발지 / 도착지 마커: 길찾기 모드일 때만 표시 */}
+                    {routePanelOpen && origin && (
+                        <MapMarker
+                            position={{ lat: origin.lat, lng: origin.lng }}
+                            image={startMarkerImg}
+                            title={`출발: ${origin.name}`}
+                            zIndex={1000}
                         />
+                    )}
 
+                    {routePanelOpen && destination && (
+                        <MapMarker
+                            position={{ lat: destination.lat, lng: destination.lng }}
+                            image={destMarkerImg}
+                            title={`도착: ${destination.name}`}
+                            zIndex={1000}
+                        />
+                    )}
+
+                    {/* 경로 Polyline (walk 혼잡색 / transit 세그먼트 색) */}
+                    {routeSegments && routeSegments.map((seg, index) => (
+                        <Polyline
+                            key={`route-seg-${index}`}
+                            path={seg.path}
+                            strokeWeight={6}
+                            strokeColor={seg.color}
+                            strokeOpacity={0.8}
+                            strokeStyle={"solid"}
+                        />
                     ))}
-
                 </Map>
 
             </div>
-
-
-
             {/* 2. 왼쪽 패널 */}
-
             <ResultPanel
-
                 open={resultsPanelOpen}
-
                 items={results} // 👈 AppPlace[] 전달
-
                 activeId={selectedPlace?.id ?? null}
-
                 onClose={() => {
-
                     setResultsPanelOpen(false);
-
                     setSelectedPlace(null);
-
                 }}
-
                 onSelect={(item) => {
                     // ResultPanel의 items가 AppPlace[]이므로 item은 AppPlace
                     handleResultItemClick(item as AppPlace);
@@ -2051,27 +1995,46 @@ ${selectedPlace.congestionLevel ? `<div style="font-size: 13px; color: #059669; 
                 open={routePanelOpen}
                 originName={origin?.name}
                 destinationName={destination?.name}
+
                 travelMode={travelMode}
                 onTravelModeChange={(mode) => {
                     setTravelMode(mode);
-                    console.log('[RoutePanel -> MapContainer] travelMode set to:', mode);
                     if (!(origin && destination)) {
                         alert("출발지와 도착지를 먼저 선택해주세요.");
                         return;
                     }
-
                     handleGetDirections(origin, destination, mode, sortOption);
                 }}
+
                 sortOption={sortOption}
                 onSortChange={(sort) => {
                     setSortOption(sort);
-                    console.log('[RoutePanel -> MapContainer] sortOption set to:', sort);
                     if (origin && destination) {
                         handleGetDirections(origin, destination, travelMode, sort);
                     }
                 }}
+
+                // 도보
                 walkSummary={walkSummary}
+
+                // 대중교통
                 transitRoutes={transitRoutes}
+                activeTransitIndex={activeTransitIndex}
+                onSelectTransitRoute={(idx) => {
+                    // 1) 패널에서 어떤 경로 클릭했는지 state 반영
+                    setActiveTransitIndex(prev => (prev === idx ? null : idx));
+
+                    // 2) 지도 라인 업데이트
+                    if (transitRoutes && transitRoutes[idx]) {
+                        const segs = buildTransitPolylineSegments(transitRoutes[idx]);
+                        setRouteSegments(segs);
+
+                        // 지도 bounds 새로 잡기
+                        const k = (window as any).kakao;
+                        fitMapToRouteSegments(k.maps, mapRef.current, segs);
+                    }
+                }}
+
                 onBack={() => {
                     setRoutePanelOpen(false);
                     setRouteSegments(null);
@@ -2079,12 +2042,15 @@ ${selectedPlace.congestionLevel ? `<div style="font-size: 13px; color: #059669; 
                     setTransitRoutes(null);
                     setOrigin(null);
                     setDestination(null);
+                    setActiveTransitIndex(null);
                     setTravelMode('walk');
+
                     if (results.length > 0) {
                         setResultsPanelOpen(true);
                     }
                 }}
             />
+
             {/* 3. 상단 UI (검색, 버튼, 카테고리) */}
             <div className="absolute top-4 left-4 right-4 md:left-4 z-[1400] flex flex-col gap-2 md:flex-row md:items-center">
                 {/* 1. 검색창 (TopSearchBar가 '검색' 버튼 포함) */}
