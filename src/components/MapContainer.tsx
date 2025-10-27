@@ -1021,7 +1021,7 @@ export default function MapContainer() {
                     endX: endPoint.lng,
                     endY: endPoint.lat,
                     mode: "transit",
-                    departureTime: new Date().toISOString(),
+                    departureTime: `2025-10-01T${new Date().toISOString().substring(11, 19)}`,
                 };
             } else {
                 requestBody = {
@@ -1030,7 +1030,7 @@ export default function MapContainer() {
                     endX: endPoint.lng,
                     endY: endPoint.lat,
                     sort: sort,
-                    departureTime: new Date().toISOString(),
+                    departureTime: `2025-10-01T${new Date().toISOString().substring(11, 19)}`,
                 };
             }
 
