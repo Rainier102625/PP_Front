@@ -1738,115 +1738,127 @@ ${selectedPlace.congestionLevel ? `<div style="font-size: 13px; color: #059669; 
             setMessages(prevMessages => [...prevMessages, errorResponse]);
 
         } finally {
-
             setIsLoading(false);
-
         }
-
     };
-
-
-
     const handleGetDirections = async (
         startPoint: AppPlace,
         endPoint: AppPlace,
         mode: 'walk' | 'transit',
         sort: 'duration' | 'congestion'
     ) => {
-
         setIsSearchLoading(true);
-        // 모든 경로 state 초기화
+
+        // 기존 경로/정보 초기화
         setRouteSegments(null);
         setWalkSummary(null);
         setTransitRoutes(null);
-        // setRoutePanelOpen(false); // (깜빡임 방지를 위해 닫지 않음)
+        // setRoutePanelOpen(false); // 깜빡임 방지로 그대로 둬도 됨
 
         try {
+            // 1. 요청 바디
             let requestBody: any;
-
-            // 1. 모드에 따라 다른 요청 본문 생성
             if (mode === 'transit') {
                 requestBody = {
-                    startX: startPoint.lng, startY: startPoint.lat,
-                    endX: endPoint.lng, endY: endPoint.lat,
+                    startX: startPoint.lng,
+                    startY: startPoint.lat,
+                    endX: endPoint.lng,
+                    endY: endPoint.lat,
                     mode: "transit",
-                    departureTime: new Date().toISOString()
+                    departureTime: new Date().toISOString(),
                 };
             } else {
                 requestBody = {
-                    startX: startPoint.lng, startY: startPoint.lat,
-                    endX: endPoint.lng, endY: endPoint.lat,
+                    startX: startPoint.lng,
+                    startY: startPoint.lat,
+                    endX: endPoint.lng,
+                    endY: endPoint.lat,
                     sort: sort,
-                    departureTime: new Date().toISOString()
+                    departureTime: new Date().toISOString(),
                 };
             }
 
-            // 2. Spring API 호출
+            console.log('[handleGetDirections] requestBody:', requestBody);
+
+            // 2. API 호출
             const response = await fetch("http://pp-domain.duckdns.org:8082/api/route", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody),
             });
 
+            console.log('[handleGetDirections] status:', response.status);
+
             if (!response.ok) {
-                throw new Error('길찾기 API 호출 실패');
+                throw new Error(`길찾기 API 호출 실패 (${response.status})`);
             }
 
             const data = await response.json();
+            console.log('[handleGetDirections] raw data:', data);
 
-            // 3. [분기] 응답 형식이 다르므로 로직을 완전히 분리
             let routesFound = false;
 
-            // 3-1. [대중교통] 응답 (Array) 처리
-            if (mode === 'transit' && Array.isArray(data) && data.length > 0) {
+            // ---------- (A) 대중교통 모드 처리 ----------
+            if (mode === 'transit') {
+                // 실제 백엔드: { transitRoutes: [ ... ] }
+                if (
+                    data &&
+                    Array.isArray(data.transitRoutes) &&
+                    data.transitRoutes.length > 0
+                ) {
+                    const transitData = data.transitRoutes as TransitRoute[];
 
-                const transitData = data as TransitRoute[];
-                setTransitRoutes(transitData);
+                    // 1) 패널에 뿌릴 데이터 저장
+                    setTransitRoutes(transitData);
 
-                // 대중교통 응답의 첫 경로에서 'congestionPoints' 파싱 시도 (있으면 그리고, 없으면 안 그림)
-                const firstRoute = transitData[0];
-                if (firstRoute.congestionPoints) {
-                    parseAndSetPolyline(firstRoute.congestionPoints);
-                } else {
-                    setRouteSegments(null); // 좌표 없으면 폴리라인 null
+                    // 2) 지도 라인(폴리라인)
+                    //    지금 백엔드 응답에는 좌표(latitude/longitude)가 없음.
+                    //    => 현재로선 경로 라인을 그릴 수 없으므로 null로 유지.
+                    setRouteSegments(null);
+
+                    routesFound = true;
                 }
-                routesFound = true;
-
             }
-            // 3-2. [도보] 응답 (Object) 처리
-            else if (mode === 'walk' && data && data.routes && Array.isArray(data.routes) && data.routes.length > 0) {
 
-                const firstRoute = data.routes[0];
-                const summary: WalkRouteSummary = {
-                    duration: firstRoute.durationInSeconds,
-                    distance: firstRoute.distanceInMeters,
-                    score: firstRoute.congestionScore,
-                    instructions: firstRoute.instructions || []
-                };
-                setWalkSummary(summary);
+            // ---------- (B) 도보 모드 처리 ----------
+            if (!routesFound && mode === 'walk') {
+                if (
+                    data &&
+                    data.routes &&
+                    Array.isArray(data.routes) &&
+                    data.routes.length > 0
+                ) {
+                    const firstRoute = data.routes[0];
 
-                // 도보 경로 폴리라인 그리기
-                parseAndSetPolyline(firstRoute.congestionPoints || []);
-                routesFound = true;
+                    const summary: WalkRouteSummary = {
+                        duration: firstRoute.durationInSeconds,
+                        distance: firstRoute.distanceInMeters,
+                        score: firstRoute.congestionScore,
+                        instructions: firstRoute.instructions || [],
+                    };
+                    setWalkSummary(summary);
+
+                    // 도보일 때는 서버에서 congestionPoints [{latitude, longitude, congestionLevel}, ...] 가 온다고 가정
+                    parseAndSetPolyline(firstRoute.congestionPoints || []);
+
+                    routesFound = true;
+                }
             }
-            // --- [수정 완료] ---
-
-            // 4. 경로 검색 실패 시 알림
-            if (!routesFound) {
+            // ---------- (C) 결과 처리 ----------
+            if (routesFound) {
+                // 경로가 정상적으로 파싱된 경우
+                setRoutePanelOpen(true);
+                setResultsPanelOpen(false);
+                setSelectedPlace(null);
+            } else {
+                // 경로 못 찾은 경우
+                console.warn('[handleGetDirections] routesFound = false. data=', data);
                 alert("경로 정보를 찾을 수 없습니다.");
-                setRoutePanelOpen(false); // 경로가 없으면 패널도 닫기
-                return;
+                setRoutePanelOpen(false);
             }
-
-            // 5. 패널 열기
-            setRoutePanelOpen(true);
-            setResultsPanelOpen(false);
-            setSelectedPlace(null);
-
-        } catch (error) {
+        } catch (error: any) {
             console.error("길찾기 오류:", error);
-            // @ts-ignore
-            alert(`길찾기 중 오류가 발생했습니다: ${error.message}`);
+            alert(`길찾기 중 오류가 발생했습니다: ${error.message || error}`);
         } finally {
             setIsSearchLoading(false);
         }
@@ -1891,8 +1903,18 @@ ${selectedPlace.congestionLevel ? `<div style="font-size: 13px; color: #059669; 
         congestionPoints.forEach((p) => bounds.extend(new (window as any).kakao.maps.LatLng(p.latitude, p.longitude)));
         mapRef.current?.setBounds(bounds);
     }
-// --- 렌더링 섹션 ---
 
+    if (loading) {
+        return (
+            <div className="w-full h-full grid place-items-center bg-gray-100">
+                <span className="text-lg font-semibold text-gray-700">
+                    지도 로딩 중...
+                </span>
+            </div>
+        );
+    }
+
+    // --- 렌더링 섹션 ---
     return (
 
         <div className="w-full h-full relative overflow-hidden">
@@ -2029,25 +2051,35 @@ ${selectedPlace.congestionLevel ? `<div style="font-size: 13px; color: #059669; 
                 open={routePanelOpen}
                 originName={origin?.name}
                 destinationName={destination?.name}
-                // 모드 관련
                 travelMode={travelMode}
-                onTravelModeChange={(mode) => setTravelMode(mode)}
-                // 도보 경로 관련
+                onTravelModeChange={(mode) => {
+                    setTravelMode(mode);
+                    console.log('[RoutePanel -> MapContainer] travelMode set to:', mode);
+                    if (!(origin && destination)) {
+                        alert("출발지와 도착지를 먼저 선택해주세요.");
+                        return;
+                    }
+
+                    handleGetDirections(origin, destination, mode, sortOption);
+                }}
                 sortOption={sortOption}
-                onSortChange={(sort) => setSortOption(sort)}
+                onSortChange={(sort) => {
+                    setSortOption(sort);
+                    console.log('[RoutePanel -> MapContainer] sortOption set to:', sort);
+                    if (origin && destination) {
+                        handleGetDirections(origin, destination, travelMode, sort);
+                    }
+                }}
                 walkSummary={walkSummary}
-                // 대중교통 경로 관련
                 transitRoutes={transitRoutes}
-                // 뒤로가기 핸들러
                 onBack={() => {
-                    setRoutePanelOpen(false); // 경로 패널 닫기
-                    setRouteSegments(null); // 폴리라인 지우기
-                    setWalkSummary(null); // 도보 데이터 지우기
-                    setTransitRoutes(null); // 대중교통 데이터 지우기
-                    setOrigin(null); // 출발지 초기화
-                    setDestination(null); // 도착지 초기화
-                    setTravelMode('walk'); // 모드 초기화
-                    // 검색 결과가 있었다면 검색 패널 다시 열기
+                    setRoutePanelOpen(false);
+                    setRouteSegments(null);
+                    setWalkSummary(null);
+                    setTransitRoutes(null);
+                    setOrigin(null);
+                    setDestination(null);
+                    setTravelMode('walk');
                     if (results.length > 0) {
                         setResultsPanelOpen(true);
                     }
