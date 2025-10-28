@@ -1376,5 +1376,3 @@ export default function MapContainer() {
         </div>
     );
 }
-
-
