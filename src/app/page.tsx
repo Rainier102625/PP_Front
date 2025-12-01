@@ -1,7 +1,7 @@
 import dynamic from "next/dynamic";
 import AppShell from "@/components/AppShell";
 import MapContainer from "@/components/MapContainer";
-// @ts-ignore
+
 
 
 export default function Home() {

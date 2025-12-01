@@ -19,6 +19,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "eslint-plugin-storybook": "^10.1.2",
     "leaflet": "^1.9.4",
     "leaflet-boundary-canvas": "^1.0.0",
     "lucide-react": "^0.544.0",

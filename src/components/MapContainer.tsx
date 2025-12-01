@@ -253,27 +253,6 @@ function buildTransitPolylineSegments(route: TransitRoute): PolylineSegment[] {
                 });
             }
         });
-
-        // *** 만약 어떤 seg에 linestring이 진짜 하나도 없을 때
-        //     (예: API가 좌표를 아직 안 주는 지하철 구간 같은 경우)
-        //     그 구간을 직선 fallback으로라도 보여주고 싶으면
-        //     아래 주석 풀면 돼.
-        //
-        // 지금은 너가 "직선 아예 보기 싫다"고 했으니까 주석 유지.
-        //
-        // if (!segmentHadAnyPolyline &&
-        //     typeof seg.startY === "number" &&
-        //     typeof seg.startX === "number" &&
-        //     typeof seg.endY === "number" &&
-        //     typeof seg.endX === "number") {
-        //     segs.push({
-        //         path: [
-        //             { lat: seg.startY, lng: seg.startX },
-        //             { lat: seg.endY,   lng: seg.endX   },
-        //         ],
-        //         color: colorForTransitMode(seg.mode),
-        //     });
-        // }
     });
 
     return segs;
