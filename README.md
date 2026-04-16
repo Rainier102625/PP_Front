@@ -1,147 +1,187 @@
-# Seoul Congestion Map
+# PP-Front — 서울 스마트 여행 지도
 
-React \+ TypeScript 기반의 서울 관광\·상권 지도 서비스입니다.  
-카카오 지도 SDK와 외부 추천/혼잡도/길찾기 API를 활용해 위치 검색, 장소 추천, 혼잡도 기반 길찾기 기능을 제공합니다.
+> **서울 지역 장소 검색 · AI 기반 장소 추천 · 실시간 혼잡도 시각화 · 대중교통 길찾기**를
+> 통합 제공하는 Next.js 15 웹 애플리케이션
+
+---
 
 ## 주요 기능
-- `src/components/MapContainer.tsx`
 
-1. **지도 및 현재 위치 표시**
-    - 카카오 지도 SDK(`react-kakao-maps-sdk`)를 사용해 서울 중심 지도를 렌더링
-    - 브라우저 Geolocation API로 현재 위치를 가져와 지도에 마커로 표시
-    - 현재 위치 버튼으로 다시 내 위치로 이동
+| 기능             | 설명                                                                             |
+| ---------------- | -------------------------------------------------------------------------------- |
+| **장소 검색**    | 카카오 키워드 검색 + 자동완성, 서울 행정 경계 내 결과만 필터링                   |
+| **AI 장소 추천** | 입력한 위치 주변 관광지·맛집·숙박 등을 AI 기반으로 추천                          |
+| **혼잡도 표시**  | 검색된 장소의 실시간 혼잡도(여유 / 보통 / 붐빔)를 마커 및 리스트에 색상으로 표시 |
+| **길찾기**       | 도보 / 대중교통(버스·지하철) 경로 검색, 혼잡도 기반 색상 폴리라인                |
+| **혼잡도 지도**  | 서울 25개 구별 혼잡 수준을 Leaflet 폴리곤 히트맵으로 시각화 (`/CongestionMap`)   |
+| **AI 채팅**      | Google Gemini 기반 여행 도우미 채팅 패널 (마크다운 렌더링 지원)                  |
+| **현재 위치**    | Geolocation API로 내 위치 탐지 및 지도 이동                                      |
 
-2. **장소 검색 및 자동완성**
-    - 상단 검색바에서 키워드 입력
-    - 카카오 장소 검색 API 기반 자동완성 (`keywordSearch`)
-    - 검색 결과는:
-        - 서울시 경계(GeoJSON) 안에 있는 결과만 필터링 (`@turf/turf` 활용)
-        - 결과 리스트 패널과 지도 마커로 동시 표시
-        - 결과 클릭 시 지도 중심 이동 및 정보 인포윈도우 표시
-
-3. **추천 장소 검색**
-    - 검색어(예: `강남역`) 주변 기반 추천 API 호출  
-      `GET http://pp-domain.duckdns.org:8082/api/recommend/`
-    - 상단 카테고리(관광지, 문화시설, 음식점 등)를 선택하면 해당 카테고리 중심으로 추천
-    - 추천 장소 리스트를 패널과 지도 마커로 표시
-
-4. **혼잡도 정보 조회**
-    - 검색 결과 장소들에 대해 혼잡도 API 호출  
-      `POST http://127.0.0.1:5001/get-congestion`
-    - 응답으로 받은 혼잡도 레벨(예: `붐빔`, `약간붐빔`, `보통`)을 리스트와 인포윈도우에 표시
-    - 혼잡도에 따라 색상을 다르게 적용
-
-5. **길찾기 (도보 / 대중교통)**
-    - 장소 인포윈도우에서:
-        - \`여기서 출발\`: 출발지 설정
-        - \`여기로 도착\`: 도착지 설정
-    - 출발지와 도착지 설정 후 길찾기 API 호출  
-      `POST http://pp-domain.duckdns.org:8082/api/route`
-    - 모드
-        - \`walk\`: 도보 경로
-            - 시간, 거리, 혼잡도 점수, 안내 문구를 패널에 표시
-            - 경로 상 각 구간의 혼잡도에 따라 색깔이 다른 Polyline으로 지도에 표시
-        - \`transit\`: 대중교통 경로
-            - 여러 경로 후보를 받아 세부 구간(버스, 지하철, 도보)로 분리
-            - 경로마다 세그먼트를 모드별 색상(버스/지하철/도보)으로 지도에 Polyline 표시
-            - 선택한 경로에 맞게 지도의 bounds 자동 조정
-    - 정렬 옵션
-        - \`duration\`, \`congestion\` 두 가지 정렬 방식 지원(도보 모드)
-
-6. **AI 어시스턴트 패널**
-   - `src/components/AiAssistantPanel.tsx`
-   - 제미나이와 채팅할 수 있는 사이드 패널 컴포넌트
-   - 화면 오른쪽에 슬라이드 인되는 대화 패널 UI 제공 (모바일에서는 하단 시트 형태)
-   - 제미나이와의 채팅 메시지 목록을 스크롤 가능한 영역으로 표시
-   - 사용자 / AI 메시지를 말풍선 형태로 좌우 구분해서 렌더링
-   - AI 응답은 `Markdown` 형식으로 렌더링
-   - AI가 제안하는 추천 문구를 버튼(pill)로 보여주고, 클릭 시 해당 내용을 바로 전송
-   - 새로운 메시지가 들어올 때마다 자동으로 스크롤을 맨 아래로 이동
-   - 입력창에서 메시지 작성 후 전송 버튼 또는 Enter로 질의 전송
-   - 우측 상단 AI 버튼 클릭 시 패널 오픈
-   - `/api/chat` 엔드포인트를 통해 대화형 질문/응답
-     - 클라이언트에서 전달된 `messages` 배열을 기반으로 대화 이력을 구성
-     - 마지막 사용자 메시지를 현재 프롬프트로 분리하여 제미나이에 전송
-     - 이전 대화 내용은 제미나이 `history` 형식으로 변환해 컨텍스트로 제공
-     - `@google/genai`의 `GoogleGenAI` 클라이언트를 사용해 `gemini-2.5-flash` 모델 호출
-     - 제미나이 응답 텍스트를 JSON 형태\(`{ text: string }`\)로 클라이언트에 반환
-     - 오류 발생 시 JSON 형태\(`{ error: string }`\)로 에러 메시지와 함께 4xx/5xx 상태 코드 응답
-   - 기본 인삿말과 추천 질문 제공
-
-7. **UI 구성 요소**
-    - `TopSearchBar`: 상단 검색 바 + 자동완성
-    - `Categories`: 카테고리 필터 (관광, 문화시설, 음식점 등)
-    - `ResultPanel`: 검색/추천 결과 리스트 패널
-    - `RoutePanel`: 도보/대중교통 길찾기 요약 및 경로 선택 패널
-    - `AiAssistantPanel`: AI 채팅 패널
-    - `CurrentLocationButton`: 내 위치로 이동 버튼
-    - 지도 위 마커 및 Polyline 커스텀 SVG 아이콘 사용
-
-**SeoulCongestionMap 주요 기능**
-
-- `src/components/SeoulCongestionMap.tsx`
-  - 서울 자치구 GeoJSON 데이터를 불러와 지도에 경계 폴리곤으로 표시
-  - 각 구별 더미 혼잡도 데이터 \(`여유`, `보통`, `약간붐빔`, `붐빔`\)를 색상으로 시각화
-  - 마우스 오버 시:
-    - 구 이름과 현재 혼잡도를 툴팁으로 표시
-    - 해당 구 영역을 혼잡도에 따라 강조 색상으로 하이라이트
-  - 구 영역 클릭 시:
-    - 혼잡도와 함께, 구별 상세 설명 문장을 팝업으로 표시
-  - Turf \`pointOnFeature\`를 사용해 각 구의 내부 대표 지점을 계산하고, 그 위치에 구 이름 라벨 표시
-  - 지도 우측 하단에 혼잡도별 색상 범례 표시 \(`여유`, `보통`, `약간 붐빔`, `붐빔`\)
-  - 줌, 드래그 등 대부분 인터랙션을 비활성화하여 정적인 인포 그래픽 형태의 지도 제공
-
-
-
-## 서버사이드 렌더링(SSR) 구조
-
-- `src/app/layout.tsx`
-    - Next.js 13\+ 기본 레이아웃 서버 컴포넌트
-    - `\ <html\>`, `\ <body\>` 골격과 전역 레이아웃을 서버에서 먼저 렌더링
-    - 폰트, `lang\="ko"`, 전역 스타일 등이 SSR 결과에 포함됨
-
-- `src/app/page.tsx`
-    - 페이지 루트는 서버 컴포넌트로 렌더링
-    - 지도 영역은 Leaflet 등 브라우저 API를 사용하는 클라이언트 컴포넌트로 분리
-    - 즉, 문서 구조와 전역 UI는 SSR, 실제 지도 인터랙션은 클라이언트 렌더링(CSR)으로 동작하는 하이브리드 구조
+---
 
 ## 기술 스택
 
-- **프론트엔드**
-    - `React` (Next.js 환경, `use client` 컴포넌트)
-    - `TypeScript`
-    - `react-kakao-maps-sdk` (카카오 지도)
-    - Tailwind CSS 스타일 클래스
+### Frontend
 
-- **지도 및 공간 분석**
-    - Kakao Maps JavaScript SDK
-    - `@turf/turf`, `@turf/helpers`를 사용한 GeoJSON 처리 및 서울시 경계 union, 포인트 포함 여부 판단
+| 분류          | 기술                                                                           |
+| ------------- | ------------------------------------------------------------------------------ |
+| 프레임워크    | [Next.js 15](https://nextjs.org/) App Router + Turbopack                       |
+| UI 라이브러리 | React 19                                                                       |
+| 언어          | TypeScript 5                                                                   |
+| 스타일링      | Tailwind CSS v4, Shadcn/ui 프리미티브 (Radix UI)                               |
+| 지도 (메인)   | [Kakao Maps SDK](https://apis.map.kakao.com/) via `react-kakao-maps-sdk`       |
+| 지도 (혼잡도) | [Leaflet](https://leafletjs.com/) — SSR 비활성화(`next/dynamic`)               |
+| 공간 연산     | [Turf.js](https://turfjs.org/) — 서울 경계 union, 장소 포함 여부 판별          |
+| AI            | [Google Gemini](https://ai.google.dev/) `gemini-2.5-flash` via `@google/genai` |
 
-- **백엔드 연동 (외부 서비스)**
-    - 추천 API: `http://pp-domain.duckdns.org:8082/api/recommend/`
-    - 길찾기 API: `http://pp-domain.duckdns.org:8082/api/route`
-    - 혼잡도 API: `http://127.0.0.1:5001/get-congestion`
-    - AI 챗 API: `/api/chat` (Next.js API Route 또는 BFF 가정)
+### API 프록시 라우트
 
-## 실행 전 요구사항
+모든 외부 서비스 호출은 서버 사이드 라우트(`/app/api/`)를 통해 프록시되어
+클라이언트에 API 키나 백엔드 URL이 노출되지 않습니다.
 
-- Node.js / npm
-- `.env` 설정
-    - `NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY`에 카카오 지도 JavaScript 키를 설정해야 함
-- 백엔드/ML 서버
-    - 추천 및 길찾기 서버(`pp-domain.duckdns.org`) 접속 가능해야 함
-    - 혼잡도 API 서버(`http://127.0.0.1:5001`)가 로컬에서 동작 중이어야 혼잡도 정보 표시 가능
-    - `/api/chat` 엔드포인트 구현 필요
+| 라우트                  | 메서드 | 역할                                                               |
+| ----------------------- | ------ | ------------------------------------------------------------------ |
+| `/api/congestion`       | POST   | 좌표 배열 → 혼잡도 레벨 (백엔드 불가 시 결정론적 더미 데이터 폴백) |
+| `/api/recommend`        | GET    | 위치·시간·카테고리 기반 장소 추천 (Spring 백엔드 프록시)           |
+| `/api/route-directions` | POST   | 도보 / 대중교통 경로 계산 (Spring 백엔드 프록시)                   |
+| `/api/odsay-directions` | GET    | ODSay 대중교통 경로 API 프록시                                     |
+| `/api/search`           | GET    | 카카오 키워드 장소 검색                                            |
+| `/api/chat`             | POST   | Gemini AI 채팅                                                     |
 
-## 설치 및 실행
+---
+
+## 프로젝트 구조
+
+```text
+src/
+├── app/
+│   ├── page.tsx                  ← async 서버 컴포넌트 (GeoJSON 서버 처리 + Suspense)
+│   ├── CongestionMap/            ← 서울 구별 혼잡도 지도 페이지
+│   └── api/                      ← 외부 API 서버 프록시 라우트 6개
+│
+├── components/
+│   ├── MapContainerClient.tsx    ← 메인 지도 클라이언트 컴포넌트 (모든 지도 상태)
+│   ├── ResultPanel.tsx           ← 검색 결과 슬라이드 패널
+│   ├── RoutePanel.tsx            ← 길찾기 경로 패널
+│   ├── AiAssistantPanel.tsx      ← AI 채팅 오버레이
+│   ├── SeoulCongestionMap.tsx    ← Leaflet 기반 구별 혼잡도 지도
+│   ├── TopSearchBar.tsx          ← 검색바 + 자동완성 래퍼
+│   ├── Categories.tsx            ← 카테고리 필터 탭
+│   └── ...
+│
+├── lib/
+│   ├── map-constants.ts          ← 초기 중심 좌표, CAT_ITEMS, 마커 이미지 상수
+│   ├── map-utils.ts              ← 순수 유틸 함수 (colorFor, 좌표 변환, 경로 구성)
+│   └── seoul-boundary.ts        ← 서버 전용: GeoJSON → Turf union (모듈 레벨 캐싱)
+│
+└── types/
+    ├── map.ts                    ← SeoulPoly, LatLng, Rec, PolylineSegment
+    ├── route.ts                  ← AppPlace, TransitRoute, WalkRouteSummary 등
+    └── ...
+```
+
+### SSR 설계 포인트
+
+- `page.tsx`가 **async 서버 컴포넌트**로 서버에서 `public/data/seoul-gu.geojson`을 읽고
+  Turf union 계산 결과를 `MapContainerClient`에 prop으로 전달 → 클라이언트 GeoJSON fetch 제거
+- `seoul-boundary.ts`는 모듈 레벨 캐싱(`let cached`)으로 서버 프로세스 내 한 번만 계산
+- 외부 백엔드 URL이 클라이언트 번들에 포함되지 않도록
+  모든 외부 호출을 `/api/*` 프록시 라우트로 격리
+
+---
+
+## 시작하기
+
+### 요구 사항
+
+- Node.js 20+
+
+### 1. 저장소 클론
 
 ```bash
-# 의존성 설치
+git clone https://github.com/<your-org>/pp-front.git
+cd pp-front
+```
+
+### 2. 패키지 설치
+
+```bash
 npm install
+```
 
-# 개발 서버 실행 (Next.js 예시)
+### 3. 환경 변수 설정
+
+프로젝트 루트에 `.env.local` 파일을 생성합니다.
+
+```env
+# 카카오 지도 (필수)
+NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY=   # 카카오 개발자 콘솔 → JavaScript 키
+KAKAO_REST_API_KEY=                 # 카카오 REST API 키
+
+# 네이버 지도
+NAVER_CLIENT_ID=
+NAVER_CLIENT_SECRET=
+
+# ODSay 대중교통 API
+ODSAY_API_KEY=
+NEXT_PUBLIC_ODSAY_API_KEY=
+
+# 한국관광공사 API
+TOUR_API_KEY=
+
+# Google Gemini (AI 채팅, 필수)
+GOOGLE_API_KEY=
+
+# Spring 백엔드 URL (기본값: http://localhost:8082)
+BACKEND_BASE=http://localhost:8082
+
+# 백엔드 없이 개발할 때 — 혼잡도 더미 데이터 사용
+MOCK_CONGESTION=1
+```
+
+### 4. 개발 서버 실행
+
+```bash
 npm run dev
+```
 
-# 브라우저에서 접속
-http://localhost:3000
+[http://localhost:3000](http://localhost:3000) 에서 확인합니다.
 
+---
+
+## 명령어
+
+```bash
+npm run dev      # Turbopack 개발 서버
+npm run build    # 프로덕션 빌드
+npm run start    # 빌드 후 프로덕션 서버 실행
+npm run lint     # ESLint 검사
+```
+
+---
+
+## 혼잡도 레벨 색상표
+
+| 레벨     | 색상           |
+| -------- | -------------- |
+| 여유     | 초록 `#35b26f` |
+| 보통     | 파랑 `#4e89ff` |
+| 약간붐빔 | 노랑 `#febd1a` |
+| 붐빔     | 빨강 `#ff5a5a` |
+
+---
+
+## 카테고리 코드표
+
+| 코드 | 카테고리       |
+| ---- | -------------- |
+| 12   | 관광지         |
+| 14   | 문화시설       |
+| 15   | 행사/공연/축제 |
+| 25   | 여행코스       |
+| 28   | 레포츠         |
+| 32   | 숙박           |
+| 38   | 쇼핑           |
+| 39   | 음식점         |
+
+---

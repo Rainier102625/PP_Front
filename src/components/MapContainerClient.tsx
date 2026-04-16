@@ -1,4 +1,4 @@
-// src/components/MapContainer.tsx
+// src/components/MapContainerClient.tsx
 
 "use client";
 
@@ -14,270 +14,49 @@ import ResultPanel from "@/components/ResultPanel";
 import { ChatMessage } from "@/types/chatMessage";
 import RoutePanel from "@/components/RoutePanel";
 import * as turf from "@turf/turf";
-import { Polygon, MultiPolygon, Feature } from "geojson";
-import { featureCollection } from "@turf/helpers";
-import { union } from "@turf/turf";
+
+import type { SeoulPoly, LatLng, Rec, PolylineSegment } from "@/types/map";
+import type { AppPlace, WalkRouteSummary, TransitSegment, TransitRoute } from "@/types/route";
+import { CatItem, INITIAL_CENTER, myMarkerImage, startMarkerImage, destMarkerImage } from "@/lib/map-constants";
+import {
+    colorFor,
+    colorForTransitMode,
+    kakaoPlaceToAppPlace,
+    recToAppPlace,
+    buildTransitPolylineSegments,
+    fitMapToRouteSegments,
+} from "@/lib/map-utils";
+
+// Re-export shared types for consumers that previously imported from MapContainer
+export type { AppPlace, WalkRouteSummary, TransitSegment, TransitRoute };
 
 import InfoWindow = kakao.maps.InfoWindow;
 
-// ----------------- 타입 -----------------
-
-type SeoulPoly = Feature<Polygon | MultiPolygon>;
-
-type LatLng = { lat: number; lng: number };
-
 type Place = kakao.maps.services.PlacesSearchResultItem;
 
-type Rec = {
-    id: string;
-    name: string;
-    address: string;
-    category: string;
-    longitude: string;
-    latitude: string;
-    congestionLevel?: string;
-    distance?: number;
-    other_info?: string;
-};
-
-export type AppPlace = {
-    id: string;
-    name: string;
-    address: string;
-    lat: number;
-    lng: number;
-    category?: string;
-    congestionLevel?: string;
-    phone?: string;
-    placeUrl?: string;
-    distance?: number;
-};
-
-// 지도에 그릴 선 한 조각
-type PolylineSegment = {
-    path: LatLng[];
-    color: string;
-};
-
-// 도보 요약
-export type WalkRouteSummary = {
-    duration: number; // 초
-    distance: number; // m
-    score: number;
-    instructions: string[];
-};
-
-// 🚍 서버에서 오는 각 step (하위 이동 단계)
-type TransitStep = {
-    streetName?: string;
-    distance?: number;
-    description?: string;
-    linestring?: string; // "lng,lat lng,lat ..." 형태
-};
-
-// 🚍 세그먼트 (버스 한 번, 지하철 한 번, 환승 도보 한 번 등)
-export type TransitSegment = {
-    mode: "WALK" | "BUS" | "SUBWAY" | "EXPRESSBUS";
-    routeNumber: string;
-    startName: string;
-    endName: string;
-    duration: number;
-    distance: number;
-    congestion?: string;
-    steps: TransitStep[];
-    startX?: number;
-    startY?: number;
-    endX?: number;
-    endY?: number;
-};
-
-// 🚍 전체 경로 후보 하나
-export type TransitRoute = {
-    totalTime: number;
-    totalDistance: number;
-    walkingDistance: number;
-    fare: number;
-    segments: TransitSegment[];
-    congestionPoints?: {
-        latitude: number;
-        longitude: number;
-        congestionLevel: string;
-    }[];
-};
-
-// ----------------- 유틸/상수 -----------------
-
-const INITIAL_CENTER: LatLng = { lat: 37.566826, lng: 126.9786567 };
-
-const CAT_ITEMS = [
-    { code: "12", name: "관광지", icon: "📍" },
-    { code: "14", name: "문화시설", icon: "🏛️" },
-    { code: "15", name: "행사/공연/축제", icon: "🎆" },
-    { code: "25", name: "여행코스", icon: "🗺️" },
-    { code: "28", name: "레포츠", icon: "🏌️" },
-    { code: "32", name: "숙박", icon: "🏨" },
-    { code: "38", name: "쇼핑", icon: "🛍️" },
-    { code: "39", name: "음식점", icon: "🍽️" },
-];
-
-function colorFor(v: string) {
-    if (v === "붐빔") return "#ff5a5a";
-    if (v === "약간붐빔" || v === "약간 붐빔") return "#febd1a";
-    if (v === "보통") return "#4e89ff";
-    return "#35b26f";
-}
-
-function colorForTransitMode(mode: string): string {
-    if (mode === "WALK") return "#888888";
-    if (mode === "SUBWAY") return "#22c55e";
-    if (mode === "BUS" || mode === "EXPRESSBUS") return "#2563eb";
-    return "#000000";
-}
-
-// 현재 위치 마커
-const myImage = {
-    src: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-        `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 32 32">
-          <circle cx="16" cy="16" r="10" fill="white"/>
-          <circle cx="16" cy="16" r="10" fill="none" stroke="rgba(0,0,0,.15)" stroke-width="1"/>
-          <circle cx="16" cy="16" r="5.5" fill="#ef4444"/>
-        </svg>`
-    )}`,
-    size: { width: 40, height: 40 },
-    options: { offset: { x: 20, y: 20 } },
-} as const;
-
-const startMarkerImg = {
-    src: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-        `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-          <circle cx="16" cy="16" r="11" fill="#10b981"/>
-          <circle cx="16" cy="16" r="6" fill="white"/>
-        </svg>`
-    )}`,
-    size: { width: 32, height: 32 },
-    options: { offset: { x: 16, y: 16 } },
-} as const;
-
-const destMarkerImg = {
-    src: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-        `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-          <circle cx="16" cy="16" r="11" fill="#ef4444"/>
-          <circle cx="16" cy="16" r="6" fill="white"/>
-        </svg>`
-    )}`,
-    size: { width: 32, height: 32 },
-    options: { offset: { x: 16, y: 16 } },
-} as const;
-
-
-// Kakao -> AppPlace 변환
-function kakaoPlaceToAppPlace(place: Place): AppPlace {
-    return {
-        id: place.id,
-        name: place.place_name,
-        address: place.road_address_name || place.address_name,
-        lat: Number(place.y),
-        lng: Number(place.x),
-        category: place.category_name,
-        phone: place.phone,
-        placeUrl: place.place_url,
-    };
-}
-
-// Spring Rec -> AppPlace
-function recToAppPlace(rec: Rec): AppPlace {
-    return {
-        id: rec.id.toString(),
-        name: rec.name,
-        address: rec.address,
-        lat: Number(rec.latitude),
-        lng: Number(rec.longitude),
-        category: rec.category,
-        congestionLevel: rec.congestionLevel,
-    };
-}
-
-// "lng,lat lng,lat ..." -> LatLng[]
-function parseLineStringToPath(linestring: string): LatLng[] {
-    return linestring
-        .trim()
-        .split(" ")
-        .map((pair) => {
-            const [lngStr, latStr] = pair.split(",");
-            return {
-                lat: parseFloat(latStr),
-                lng: parseFloat(lngStr),
-            };
-        });
-}
-
-// 여러 step을 이어붙여서 한 경로로
-function buildPathFromSteps(steps: TransitStep[]): LatLng[] {
-    const merged: LatLng[] = [];
-
-    steps.forEach((step) => {
-        if (!step.linestring) return;
-        const pts = parseLineStringToPath(step.linestring);
-
-        pts.forEach((p) => {
-            const last = merged[merged.length - 1];
-            if (!last || last.lat !== p.lat || last.lng !== p.lng) {
-                merged.push(p);
-            }
-        });
-    });
-
-    return merged;
-}
-
-function stepLinestringToPath(step: { linestring?: string }): LatLng[] {
-    if (!step.linestring || step.linestring.trim() === "") return [];
-    return parseLineStringToPath(step.linestring);
-}
-
-// 대중교통 경로 전체 -> 지도에 그릴 PolylineSegment[]
-function buildTransitPolylineSegments(route: TransitRoute): PolylineSegment[] {
-    const segs: PolylineSegment[] = [];
-
-    route.segments.forEach((seg) => {
-        let segmentHadAnyPolyline = false;
-
-        (seg.steps || []).forEach((step: any) => {
-            const pts = stepLinestringToPath(step);
-            if (pts.length >= 2) {
-                segmentHadAnyPolyline = true;
-
-                segs.push({
-                    path: pts,
-                    color: colorForTransitMode(seg.mode),
-                });
-            }
-        });
-    });
-
-    return segs;
-}
-
-// 지도 bounds를 경로 전체에 맞게 조정
-function fitMapToRouteSegments(
-    kakaoMaps: any,
+// 지도 bounds를 경로 전체에 맞게 조정 (내부 헬퍼 — 이미 map-utils에 있지만 kakao 글로벌 참조가 필요)
+function fitMapToCongestionPoints(
     mapObj: kakao.maps.Map | null,
-    segs: PolylineSegment[]
+    congestionPoints: { latitude: number; longitude: number; congestionLevel: string }[]
 ) {
-    if (!mapObj || !kakaoMaps || !segs.length) return;
-
-    const bounds = new kakaoMaps.LatLngBounds();
-    segs.forEach((seg) => {
-        seg.path.forEach((p) => {
-            bounds.extend(new kakaoMaps.LatLng(p.lat, p.lng));
-        });
-    });
+    if (!mapObj || !congestionPoints.length) return;
+    const bounds = new (window as any).kakao.maps.LatLngBounds();
+    congestionPoints.forEach((p) =>
+        bounds.extend(new (window as any).kakao.maps.LatLng(p.latitude, p.longitude))
+    );
     mapObj.setBounds(bounds);
+}
+
+// ----------------- Props -----------------
+
+interface MapContainerClientProps {
+    seoulBoundary: SeoulPoly | null;
+    categoryItems: CatItem[];
 }
 
 // ----------------- 컴포넌트 -----------------
 
-export default function MapContainer() {
+export default function MapContainerClient({ seoulBoundary, categoryItems }: MapContainerClientProps) {
     const [loading] = useKakaoLoader({
         appkey: process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY!,
         libraries: ["services"],
@@ -301,9 +80,6 @@ export default function MapContainer() {
     // 로딩/에러
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [isSearchLoading, setIsSearchLoading] = useState(false);
-
-    // 서울 경계
-    const [seoulPolygon, setSeoulPolygon] = useState<SeoulPoly | null>(null);
 
     // 길찾기
     const [origin, setOrigin] = useState<AppPlace | null>(null);
@@ -517,40 +293,6 @@ export default function MapContainer() {
         };
     }, [selectedPlace]);
 
-    // 서울시 경계 load (처음만)
-    useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch("/data/seoul-gu.geojson");
-                const geojson = await res.json();
-                if (!geojson?.features || geojson.features.length === 0) return;
-
-                const polys = geojson.features.filter(
-                    (f: any) =>
-                        f?.geometry &&
-                        (f.geometry.type === "Polygon" || f.geometry.type === "MultiPolygon")
-                );
-                if (polys.length === 0) return;
-
-                let combined: SeoulPoly | null = polys[0] as SeoulPoly;
-                for (let i = 1; i < polys.length; i++) {
-                    try {
-                        const fc = featureCollection([combined as SeoulPoly, polys[i] as SeoulPoly]);
-                        const merged = union(fc) as SeoulPoly | null;
-                        if (merged) {
-                            combined = merged;
-                        }
-                    } catch (err) {
-                        console.error(`Turf union error at index ${i}:`, err);
-                    }
-                }
-                setSeoulPolygon(combined);
-            } catch (error) {
-                console.error("Failed to load or process GeoJSON:", error);
-            }
-        })();
-    }, []);
-
     // 출발/도착/모드/정렬 바뀔 때마다 경로 호출
     useEffect(() => {
         if (origin && destination) {
@@ -678,10 +420,10 @@ export default function MapContainer() {
             async (data: Place[], status) => {
                 if (status === k.maps.services.Status.OK) {
                     const filteredData = data.filter((place) => {
-                        if (!seoulPolygon) return true;
+                        if (!seoulBoundary) return true;
                         try {
                             const point = turf.point([Number(place.x), Number(place.y)]);
-                            return turf.booleanPointInPolygon(point, seoulPolygon);
+                            return turf.booleanPointInPolygon(point, seoulBoundary);
                         } catch (e) {
                             console.error("Point in polygon check error:", e);
                             return false;
@@ -740,18 +482,15 @@ export default function MapContainer() {
         )}`;
         const datetime = "2025-10-01T" + time;
 
-        const locations = places.map((p) => ({
-            lat: p.lat,
-            lon: p.lng,
+        // /api/congestion 이 기대하는 형식: [{latitude, longitude, datetime}]
+        const requestBody = places.map((p) => ({
+            latitude: p.lat,
+            longitude: p.lng,
+            datetime,
         }));
 
-        const requestBody = {
-            datetime: datetime,
-            locations: locations,
-        };
-
         try {
-            const response = await fetch("http://127.0.0.1:5001/get-congestion", {
+            const response = await fetch("/api/congestion", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -768,13 +507,12 @@ export default function MapContainer() {
                 return places;
             }
 
-            const data = await response.json();
-            const congestionLevels: string[] = data.congestion_levels;
+            const data: { latitude: number; longitude: number; datetime: string; congestionLevel: string }[] = await response.json();
 
-            if (congestionLevels && congestionLevels.length === places.length) {
+            if (Array.isArray(data) && data.length === places.length) {
                 return places.map((place, index) => ({
                     ...place,
-                    congestionLevel: congestionLevels[index],
+                    congestionLevel: data[index].congestionLevel,
                 }));
             } else {
                 console.error("혼잡도 API 응답 형식 오류 또는 길이 불일치");
@@ -820,7 +558,7 @@ export default function MapContainer() {
             const lon = location.getLng();
             const categoryQuery = selectedCat || "";
 
-            const apiUrl = `http://pp-domain.duckdns.org:8082/api/recommend/?lat=${lat}&lon=${lon}&time=${time}&congestionDateTime=2025-10-01T${time}&type=${categoryQuery}`;
+            const apiUrl = `/api/recommend?lat=${lat}&lon=${lon}&time=${time}&congestionDateTime=2025-10-01T${time}&type=${categoryQuery}`;
 
             const response = await fetch(apiUrl);
             if (!response.ok) {
@@ -1013,7 +751,7 @@ export default function MapContainer() {
                 };
             }
 
-            const response = await fetch("http://pp-domain.duckdns.org:8082/api/route", {
+            const response = await fetch("/api/route-directions", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(requestBody),
@@ -1136,14 +874,7 @@ export default function MapContainer() {
         segments.push(currentSegment);
 
         setRouteSegments(segments);
-
-        const bounds = new (window as any).kakao.maps.LatLngBounds();
-        congestionPoints.forEach((p) =>
-            bounds.extend(
-                new (window as any).kakao.maps.LatLng(p.latitude, p.longitude)
-            )
-        );
-        mapRef.current?.setBounds(bounds);
+        fitMapToCongestionPoints(mapRef.current, congestionPoints);
     };
 
     if (loading) {
@@ -1168,7 +899,7 @@ export default function MapContainer() {
                     onCreate={(m) => (mapRef.current = m)}
                 >
                     {myLocation && (
-                        <MapMarker position={myLocation} image={myImage} zIndex={999} />
+                        <MapMarker position={myLocation} image={myMarkerImage} zIndex={999} />
                     )}
 
                     {!routePanelOpen &&
@@ -1193,7 +924,7 @@ export default function MapContainer() {
                     {routePanelOpen && origin && (
                         <MapMarker
                             position={{ lat: origin.lat, lng: origin.lng }}
-                            image={startMarkerImg}
+                            image={startMarkerImage}
                             title={`출발: ${origin.name}`}
                             zIndex={1000}
                         />
@@ -1202,7 +933,7 @@ export default function MapContainer() {
                     {routePanelOpen && destination && (
                         <MapMarker
                             position={{ lat: destination.lat, lng: destination.lng }}
-                            image={destMarkerImg}
+                            image={destMarkerImage}
                             title={`도착: ${destination.name}`}
                             zIndex={1000}
                         />
@@ -1251,7 +982,6 @@ export default function MapContainer() {
                         alert("출발지와 도착지를 먼저 선택해주세요.");
                         return;
                     }
-                    // 실제 API 호출은 useEffect에서 다시 돌아감
                 }}
                 sortOption={sortOption}
                 onSortChange={(sort) => {
@@ -1260,7 +990,6 @@ export default function MapContainer() {
                         alert("출발지와 도착지를 먼저 선택해주세요.");
                         return;
                     }
-                    // 실제 API 호출은 useEffect에서 다시 돌아감
                 }}
                 walkSummary={walkSummary}
                 transitRoutes={transitRoutes}
@@ -1328,7 +1057,7 @@ export default function MapContainer() {
                 </button>
 
                 <Categories
-                    items={CAT_ITEMS}
+                    items={categoryItems}
                     value={selectedCat}
                     onChange={handleCategoryChange}
                     className="w-full md:min-w-0 md:flex-1"

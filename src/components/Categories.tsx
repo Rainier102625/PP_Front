@@ -1,6 +1,8 @@
 "use client";
 
-type CatItem = { code: string; name: string; icon?: string };
+import type { CatItem } from "@/lib/map-constants";
+
+export type { CatItem };
 
 type Props = {
     items: CatItem[];

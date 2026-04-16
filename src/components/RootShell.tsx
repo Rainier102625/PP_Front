@@ -1,8 +1,8 @@
-"use client"; // 👈 1. 클라이언트 컴포넌트로 선언
+"use client"; // 클라이언트 컴포넌트 선언
 
 import { useState } from "react";
 import AppShell from "@/components/AppShell";
-import AsideBar from "@/components/AsideBar"; // (파일명이 AsideBar.tsx라고 가정)
+import AsideBar from "@/components/AsideBar";
 import MenuDrawer from "@/components/MenuDrawer";
 
 export default function RootShell({
@@ -16,7 +16,7 @@ export default function RootShell({
     return (
             <AppShell mode="desktop" width={1280}>
             <div className="flex h-full w-full ">
-                {/* 3. AsideBar에 'onMenuOpen' 함수를 prop으로 전달 */}
+                {/*AsideBar에 'onMenuOpen' 함수를 prop으로 전달 */}
                 <AsideBar onMenuOpen={() => setMenuOpen(true)} />
 
                 {/* 4. 메인 컨텐츠 (page.tsx가 됨) */}

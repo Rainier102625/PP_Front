@@ -3,9 +3,7 @@
 "use client";
 
 import React from "react";
-// --- 👇 [수정] AppPlace 타입을 MapContainer에서 import ---
-// (경로가 다르면 "@/components/MapContainer" 등으로 수정하세요)
-import type { AppPlace } from "./MapContainer";
+import type { AppPlace } from "@/types/route";
 
 type Props = {
     open: boolean;
